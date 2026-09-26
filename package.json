@@ -1,0 +1,28 @@
+{
+  "name": "yaml-design-verifier",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "verify": "node src/cli.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "string-width": "^8.3.0",
+    "yaml": "^2.8.1"
+  },
+  "bin": {
+    "seda": "bin/yaml-design.cjs",
+    "yaml-design": "bin/yaml-design.cjs"
+  },
+  "files": [
+    "src/",
+    "design-yaml/",
+    "docs/",
+    "README.md",
+    "bin/"
+  ]
+}
