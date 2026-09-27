@@ -1,0 +1,19 @@
+design_system_file: design-system.yaml
+main:
+  - id: screen01
+    type: screen
+    spec_file: features/screen01/screen01.spec.yaml
+    view_file: features/screen01/screen01.view.yaml
+    test_file: features/screen01/screen01.test.yaml
+  - id: screen02
+    type: screen
+    spec_file: features/screen02/screen02.spec.yaml
+    view_file: features/screen02/screen02.view.yaml
+    test_file: features/screen02/screen02.test.yaml
+app_file: app.yaml
+routes:
+  - path: /
+    screen: screen01
+  - path: /confirm
+    screen: screen02
+database_file: database.yaml

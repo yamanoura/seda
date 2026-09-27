@@ -1,3 +1,4 @@
+import {createDatabase} from './database.js';
 import {loadApplication, composeScreen, enterRoute} from './application.js';
 import stringWidth from 'string-width';
 import { compileDesign, DefinitionError } from './verifier.js';
@@ -15,9 +16,9 @@ const pad = (text, width, align = 'left') => {
   return ' '.repeat(left) + text + ' '.repeat(gap - left);
 };
 
-export function renderPreview(spec, document, { screen, device = 'desktop', width = 60, values = {}, numbered = false, focused, path } = {}) {
+export function renderPreview(spec, document, { screen, device = 'desktop', width = 60, values = {}, numbered = false, focused, path, databaseSchema } = {}) {
   const address = path === undefined ? undefined : `URL [ ${label(path, 'path')} ]`;
-  const design = compileDesign(spec, screen);
+  const design = compileDesign(spec, screen, databaseSchema);
   const view = document?.[design.screenId];
   requireValue(view && typeof view === 'object', 'view', `画面が存在しません: ${design.screenId}`);
   requireValue(['desktop', 'mobile'].includes(device), 'device', 'desktop / mobile を指定してください');
@@ -103,16 +104,19 @@ export async function loadPreviewScreens(filename, options = {}) {
   if (options.screen && !screens.some(s => s.screen === options.screen)) throw new DefinitionError(`画面が存在しません: ${options.screen}`);
   if (!options.screen) return screens;
   const selected = screens.filter(s => s.screen === options.screen);
-  selected.app=screens.app; selected.routes=screens.routes; selected.catalog=screens.catalog;
+  selected.databaseSchema=screens.databaseSchema; selected.app=screens.app; selected.routes=screens.routes; selected.catalog=screens.catalog;
   return selected;
 }
 
 export async function previewProject(filename, options = {}) {
   const screens = await loadPreviewScreens(filename);
+  const database=createDatabase(screens.databaseSchema);
+  try {
+  options={...options,databaseSchema:screens.databaseSchema};
   if (screens.app) {
     const path = options.path ?? (options.screen ? [...screens.routes].find(([,id]) => id === options.screen)?.[0] : '/');
     if (!path) throw new DefinitionError(`画面が存在しません: ${options.screen}`);
-    const entered=enterRoute(screens,path);
+    const entered=enterRoute(screens,path,{},database);
     renderPreview(entered.screen.spec,entered.screen.view,{...options,screen:entered.screen.screen});
     const {spec,view}=composeScreen(entered.screen,screens.app);
     return [{screen:entered.screen.screen,path:entered.path,common_results:entered.hooks,text:renderPreview(spec,view,{...options,screen:entered.screen.screen,path:entered.path})}];
@@ -121,4 +125,5 @@ export async function previewProject(filename, options = {}) {
   const selected=screens.filter(s=>!options.screen || s.screen===options.screen);
   if (!selected.length) throw new DefinitionError(`画面が存在しません: ${options.screen}`);
   return selected.map(({screen,spec,view})=>({screen,text:renderPreview(spec,view,{...options,screen})}));
+  } finally { database?.close(); }
 }

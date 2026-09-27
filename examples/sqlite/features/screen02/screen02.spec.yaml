@@ -1,0 +1,107 @@
+screen02:
+  description: ユーザ登録確認
+  inputs:
+    - id: name
+      type: text
+      required: true
+    - id: age
+      type: number
+      required: true
+  fields:
+    - id: name
+      label: 名前
+      readonly: true
+      source:
+        input: name
+    - id: age
+      label: 年齢
+      readonly: true
+      source:
+        input: age
+    - id: confirm_button
+      type: button
+      label: 確定
+      trigger: click
+      action: confirm_entry
+      inputs:
+        name:
+          field: name
+        age:
+          field: age
+  actions:
+    - id: confirm_entry
+      inputs:
+        - id: name
+          type: text
+        - id: age
+          type: number
+      steps:
+        - id: register
+          type: process
+          action: create_user
+          inputs:
+            name:
+              input: name
+            age:
+              input: age
+        - id: log
+          type: debug
+          message: "登録データ:"
+          data:
+            result: register
+        - id: completed
+          type: message
+          message: 登録しました。
+        - id: transition
+          type: transition
+          target: /
+    - id: create_user
+      inputs:
+        - id: name
+          type: text
+        - id: age
+          type: number
+      steps:
+        - id: plan
+          type: db
+          where:
+            id:
+              literal: 1
+          operation: findUnique
+          model: plans
+        - id: insert_user
+          type: db
+          operation: create
+          model: users
+          data:
+            name:
+              input: name
+            age:
+              input: age
+            plan_id:
+              result: plan
+              column: id
+            credit:
+              result: plan
+              column: initial_credit
+        - id: count_registration
+          type: db
+          where:
+            id:
+              result: plan
+              column: id
+          operation: update
+          model: plans
+          data:
+            registrations:
+              add:
+                - result: plan
+                  column: registrations
+                - literal: 1
+        - id: return_user
+          type: return
+          value:
+            result: insert_user
+      returns:
+        model: users
+  validations: []

@@ -23,3 +23,9 @@ test('処理到達は自動表示せず、明示的なdebugログを表示する
   assert.doesNotMatch(text, /処理到達|create_user/);
   assert.doesNotMatch(text, /\x1b/);
 });
+
+test('DBエラーを入力エラーとして二重表示しない', () => {
+  const text=formatFeedback({success:false,messages:['DBエラー: users.nameの重複'],validation_error:[],db_error:['SQLITE_CONSTRAINT_UNIQUE'],processes:[]});
+  assert.match(text,/DBエラー: users.nameの重複/);
+  assert.doesNotMatch(text,/入力エラー/);
+});

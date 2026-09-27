@@ -1,0 +1,39 @@
+database:
+  engine: sqlite
+  tables:
+    - id: plans
+      columns:
+        - id: id
+          type: integer
+          primary_key: true
+        - id: name
+          type: text
+        - id: initial_credit
+          type: integer
+        - id: registrations
+          type: integer
+          default: 0
+    - id: users
+      columns:
+        - id: id
+          type: integer
+          primary_key: true
+          generated: true
+        - id: name
+          type: text
+          unique: true
+        - id: age
+          type: integer
+        - id: plan_id
+          type: integer
+          references:
+            table: plans
+            column: id
+        - id: credit
+          type: integer
+  seed:
+    plans:
+      - id: 1
+        name: 標準
+        initial_credit: 100
+    users: []

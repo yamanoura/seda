@@ -1,0 +1,51 @@
+design_tests:
+  - name: 正常入力で確認へ
+    action: add_entry
+    input:
+      name: 山田太郎
+      age: 30
+    expect:
+      success: true
+      processes: []
+      transition:
+        target: /confirm
+        inputs:
+          name: 山田太郎
+          age: 30
+      executed_steps:
+        - validate
+        - transition
+  - name: 名前必須エラーで遷移しない
+    action: add_entry
+    input:
+      name: ""
+      age: 30
+    expect:
+      success: false
+      validation_error:
+        - validation: required
+          target: name
+      transition: null
+      processes: []
+  - name: 年齢の文字列は遷移しない
+    action: add_entry
+    input:
+      name: 山田
+      age: ABC
+    expect:
+      validation_error:
+        - validation: is_number
+          target: age
+      transition: null
+  - name: 年齢0は許可する
+    action: add_entry
+    input:
+      name: 山田
+      age: 0
+    expect:
+      success: true
+      transition:
+        target: /confirm
+        inputs:
+          name: 山田
+          age: 0

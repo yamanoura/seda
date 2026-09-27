@@ -14,7 +14,7 @@ const help = `使い方:
   seda verify --design <spec.yaml> --test <test.yaml> [--screen <ID>] [--json]
   seda preview [--project <project.yaml>] [--screen <ID>] [--device desktop|mobile] [--width 60]
   seda preview --design <spec.yaml> --view <view.yaml> [--json]
-  seda interact [--project <project.yaml>] [--path /]
+  seda interact [--project <project.yaml>] [--path /] [--db-file <保存先.sqlite>]
   seda preview --interactive [--path /]
   seda --version
 
@@ -23,13 +23,14 @@ routes定義がある場合、preview・interactは / から共通appを経由�
 initはユーザ登録の設計・表示・テスト・Design Systemのサンプルを新規ディレクトリに作成します。
 --design/--test指定時は両方必須で、--projectとは併用できません。
 終了コード: 0=成功、1=期待値不一致、2=定義・読み込み・引数エラー。
-processは同画面のアクションを模擬実行。previewはテキストによる配置確認です。実際の色・CSS・画面動作は再現しません。`;
+database_fileがあればSQLiteでDB操作を実行します。verifyはケースごとに独立したメモリDB、interactは起動中共有（--db-fileで永続化）。
+processは同画面のアクションを実行。previewはテキストによる配置確認です。実際の色・CSS・画面動作は再現しません。`;
 let json = false;
 try {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
     project: { type: 'string', short: 'p' },
     design: { type: 'string' }, test: { type: 'string' }, screen: { type: 'string' },
-    path: { type: 'string' }, view: { type: 'string' }, device: { type: 'string' }, width: { type: 'string' },
+    'db-file': { type: 'string' }, path: { type: 'string' }, view: { type: 'string' }, device: { type: 'string' }, width: { type: 'string' },
     interactive: { type: 'boolean' },
     json: { type: 'boolean', default: false },
     help: { type: 'boolean', short: 'h' }, version: { type: 'boolean', short: 'v' },
@@ -37,6 +38,7 @@ try {
   json = values.json;
   if (values.path !== undefined && (values.screen !== undefined || values.design !== undefined)) throw new DefinitionError('--pathは--screen・--designと併用できません');
   const command = positionals[0] ?? 'verify';
+  if (values['db-file'] !== undefined && (!(command==='interact' || command==='preview' && values.interactive) || values.design!==undefined || values.view!==undefined)) throw new DefinitionError('--db-fileはprojectを使う対話モード専用です。verify・previewはメモリDBを使います');
   if (values.interactive && command !== 'preview') throw new DefinitionError('--interactiveはpreview専用です');
   if (values.help) console.log(help);
   else if (values.version) {
@@ -54,7 +56,7 @@ try {
     if (positionals.length > 1 || values.json || values.test !== undefined) throw new DefinitionError('対話モードに--json・--test・追加の位置引数は指定できません');
     const direct = values.design !== undefined || values.view !== undefined;
     if (direct && (!values.design || !values.view || values.project !== undefined)) throw new DefinitionError('--design と --view は両方指定し、--projectとは併用しないでください');
-    const options = { path: values.path, screen: values.screen, device: values.device ?? 'desktop', width: values.width === undefined ? 60 : Number(values.width) };
+    const options = { dbFile: values['db-file'] === undefined ? undefined : resolve(values['db-file']), path: values.path, screen: values.screen, device: values.device ?? 'desktop', width: values.width === undefined ? 60 : Number(values.width) };
     let spec, view;
     if (direct) {
       spec = await readYaml(values.design); view = await readYaml(values.view);
@@ -69,7 +71,7 @@ try {
     if (positionals.length > 1 || values.test !== undefined) throw new DefinitionError('previewには--testや追加の位置引数を指定できません');
     const direct = values.design !== undefined || values.view !== undefined;
     if (direct && (!values.design || !values.view || values.project !== undefined)) throw new DefinitionError('--design と --view は両方指定し、--projectとは併用しないでください');
-    const options = { path: values.path, screen: values.screen, device: values.device ?? 'desktop', width: values.width === undefined ? 60 : Number(values.width) };
+    const options = { dbFile: values['db-file'] === undefined ? undefined : resolve(values['db-file']), path: values.path, screen: values.screen, device: values.device ?? 'desktop', width: values.width === undefined ? 60 : Number(values.width) };
     const previews = direct
       ? [{ text: renderPreview(await readYaml(values.design), await readYaml(values.view), options) }]
       : await previewProject(values.project ?? await findProject(), options);
@@ -87,7 +89,7 @@ try {
     const passed = results.filter(r => r.passed).length;
     if (json) console.log(JSON.stringify({ mode: 'design-simulation', total: results.length, passed, failed: results.length - passed, results }, null, 2));
     else {
-      console.log('設計シミュレーション（アクションを模擬実行・データ保存なし）');
+      console.log('設計検証（DB操作はテストごとの一時DBで実行）');
       for (const result of results) {
         console.log(`${result.passed ? 'PASS' : 'FAIL'} ${result.screen ? `[${result.screen}] ` : ''}${result.name}`);
         for (const diff of result.differences) console.log(`  ${diff.key}\n    expected: ${JSON.stringify(diff.expected)}\n    actual:   ${JSON.stringify(diff.actual)}`);

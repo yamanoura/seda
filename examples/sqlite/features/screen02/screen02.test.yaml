@@ -1,0 +1,83 @@
+design_tests:
+  - name: 既存プランを参照して登録し、登録数を更新
+    action: confirm_entry
+    screen_inputs:
+      name: 山田
+      age: 30
+    input: {}
+    expect:
+      success: true
+      action_results:
+        register: {id: 1, name: 山田, age: 30, plan_id: 1, credit: 100}
+      database:
+        users:
+          - id: 1
+            name: 山田
+            age: 30
+            plan_id: 1
+            credit: 100
+        plans:
+          - id: 1
+            registrations: 1
+  - name: テストごとにデータが初期化される
+    action: confirm_entry
+    screen_inputs:
+      name: 山田
+      age: 30
+    input: {}
+    expect:
+      success: true
+      database:
+        users:
+          - id: 1
+            name: 山田
+            credit: 100
+        plans:
+          - id: 1
+            registrations: 1
+  - name: ケースの初期データでプランを差し替える
+    action: confirm_entry
+    screen_inputs:
+      name: 佐藤
+      age: 25
+    input: {}
+    database:
+      plans:
+        - id: 1
+          name: 特別
+          initial_credit: 500
+          registrations: 10
+    expect:
+      success: true
+      database:
+        users:
+          - name: 佐藤
+            credit: 500
+        plans:
+          - id: 1
+            registrations: 11
+  - name: 重複登録は取り消される
+    action: confirm_entry
+    screen_inputs:
+      name: 山田
+      age: 30
+    input: {}
+    database:
+      users:
+        - id: 1
+          name: 山田
+          age: 20
+          plan_id: 1
+          credit: 100
+    expect:
+      success: false
+      db_error:
+        - SQLITE_CONSTRAINT_UNIQUE
+      database:
+        users:
+          - id: 1
+            name: 山田
+            age: 20
+        plans:
+          - id: 1
+            registrations: 0

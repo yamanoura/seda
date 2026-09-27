@@ -1,3 +1,4 @@
+import {createDatabase,validateRows} from './database.js';
 import {isDeepStrictEqual} from 'node:util';
 import {loadApplication, composeScreen, enterRoute} from './application.js';
 import {renderPreview} from './preview.js';
@@ -11,12 +12,15 @@ export async function runProject(filename, screenId) {
   for (const screen of screens) {
     if (screens.app) {
       // 共通レイアウトと全画面の組み合わせを静的に検証する。
-      renderPreview(screen.spec, screen.view, {screen:screen.screen});
+      renderPreview(screen.spec, screen.view, {screen:screen.screen,databaseSchema:screens.databaseSchema});
       const combined = composeScreen(screen, screens.app);
-      renderPreview(combined.spec, combined.view, {screen:screen.screen});
+      renderPreview(combined.spec, combined.view, {screen:screen.screen,databaseSchema:screens.databaseSchema});
     }
   }
-  if (screens.app) for (const path of screens.routes.keys()) enterRoute(screens,path);
+  if (screens.app) for (const path of screens.routes.keys()) {
+    const database=createDatabase(screens.databaseSchema);
+    try {enterRoute(screens,path,{},database);} finally {database?.close();}
+  }
   for (const screen of screens.filter(s => !screenId || s.screen === screenId)) {
     try {
       results.push(...runTests(screen.spec, await readYaml(screen.testFile), screen.screen, screens.catalog).map(r => ({screen:screen.screen, ...r})));
@@ -43,19 +47,25 @@ async function runRouteTests(screens) {
   const fail=message=>{throw new DefinitionError(`${screens.routeTestFile}: ${message}`);};
   if (!document || Object.keys(document).some(k=>k!=='route_tests') || !Array.isArray(document.route_tests) || !document.route_tests.length) fail('route_testsに1件以上必要です');
   return document.route_tests.map((test,index)=>{
-    if (!test || typeof test!=='object' || Array.isArray(test) || Object.keys(test).some(k=>!['name','path','screen_inputs','expect'].includes(k))) fail('未対応のルートテスト形式です');
+    if (!test || typeof test!=='object' || Array.isArray(test) || Object.keys(test).some(k=>!['name','path','screen_inputs','database','expect'].includes(k))) fail('未対応のルートテスト形式です');
     if (test.name!==undefined && typeof test.name!=='string') fail('nameには文字列が必要です');
     const expected=test.expect;
     if (!expected || typeof expected!=='object' || Array.isArray(expected) || !Object.keys(expected).length) fail('expectに期待値が必要です');
     for (const [key,value] of Object.entries(expected)) {
-      if (['path','screen'].includes(key)) { if(typeof value!=='string') fail(`${key}には文字列が必要です`); }
+      if(key==='database') validateRows(screens.databaseSchema,value);
+      else if (['path','screen'].includes(key)) { if(typeof value!=='string') fail(`${key}には文字列が必要です`); }
       else if (['messages','debug_logs'].includes(key)) {if(!Array.isArray(value)||value.some(v=>typeof v!=='string')) fail(`${key}には文字列の配列が必要です`);}
       else fail(`未対応の期待値: ${key}`);
     }
-    const entered=enterRoute(screens,test.path,test.screen_inputs ?? {});
-    initializeFields(entered.screen.design,entered.received);
-    const actual={path:entered.path,screen:entered.screen.screen,messages:entered.hooks.flatMap(h=>h.messages),debug_logs:entered.hooks.flatMap(h=>h.debug_logs)};
-    const differences=Object.entries(expected).filter(([key,value])=>!isDeepStrictEqual(value,actual[key])).map(([key,value])=>({key,expected:value,actual:actual[key]}));
-    return {screen:'routes',name:test.name ?? `route ${index+1}`,passed:!differences.length,differences,actual};
+    if(test.database !== undefined) validateRows(screens.databaseSchema,test.database,{complete:true});
+    const database=createDatabase(screens.databaseSchema,{seed:test.database ?? {}});
+    try {
+      const entered=enterRoute(screens,test.path,test.screen_inputs ?? {},database);
+      initializeFields(entered.screen.design,entered.received);
+      const actual={path:entered.path,screen:entered.screen.screen,messages:entered.hooks.flatMap(h=>h.messages),debug_logs:entered.hooks.flatMap(h=>h.debug_logs)};
+      if(expected.database !== undefined) actual.database=database.snapshot(expected.database);
+      const differences=Object.entries(expected).filter(([key,value])=>!isDeepStrictEqual(value,actual[key])).map(([key,value])=>({key,expected:value,actual:actual[key]}));
+      return {screen:'routes',name:test.name ?? `route ${index+1}`,passed:!differences.length,differences,actual};
+    } finally {database?.close();}
   });
 }

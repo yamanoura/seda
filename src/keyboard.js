@@ -17,7 +17,7 @@ export function keyboardController(session) {
     state: () => ({ focus, editing, draft: draft.join(''), cursor, done, feedback }),
     render() {
       const edit = editing ? `編集中: ${safe(field().label)} [${draft.slice(0, cursor).join('')}│${draft.slice(cursor).join('')}]\nEnter: 確定 | Esc: 取消 | ←→: カーソル | Tab: 確定して次へ` : 'Tab / ↓→: 次へ | Shift+Tab / ↑←: 前へ | Enter: 編集・押下 | r: リセット | q: 終了';
-      return `対話ワイヤーフレーム（processは模擬・保存なし）\n${session.render(field().id, editing ? draft.join('') : undefined)}\n${feedback}--- 操作ガイド ---\n${edit}\nCtrl+C: 終了`;
+      return `対話ワイヤーフレーム（${session.databaseInfo ?? 'processは模擬・保存なし'}）\n${session.render(field().id, editing ? draft.join('') : undefined)}\n${feedback}--- 操作ガイド ---\n${edit}\nCtrl+C: 終了`;
     },
     key(text, key = {}) {
       if (key.ctrl && (key.name === 'c' || key.name === 'd')) { done = true; return; }

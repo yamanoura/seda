@@ -1,3 +1,7 @@
+import {mkdtemp,writeFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {stringify} from 'yaml';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
@@ -6,9 +10,12 @@ import {readYaml} from '../src/verifier.js';
 import {renderPreview} from '../src/preview.js';
 import {createSession} from '../src/interact.js';
 import {keyboardController} from '../src/keyboard.js';
-const project='examples/menu-bar/project.yaml';
-const spec=await readYaml('examples/menu-bar/features/screen01/screen01.spec.yaml');
-const view=await readYaml('examples/menu-bar/features/screen01/screen01.view.yaml');
+const spec=await readYaml('design-yaml/features/screen01/screen01.spec.yaml');
+const view=await readYaml('design-yaml/features/screen01/screen01.view.yaml');
+spec.screen01.fields.push({id:'help_button',type:'button',label:'ヘルプ',trigger:'click',action:'show_help',inputs:{}});
+spec.screen01.actions.push({id:'show_help',inputs:[],steps:[{id:'help',type:'message',message:'名前と年齢を入力して登録を選んでください。'}]});
+view.screen01.layout.menu_bar={fields:['help_button','add_button']};
+view.screen01.layout.sections=view.screen01.layout.sections.filter(s=>s.id!=='operations');
 
 test('メニューバーを本文の上に横並び表示し、日本語の枠を揃える',()=>{
   for(const device of ['desktop','mobile']) {
@@ -50,9 +57,14 @@ test('未定義・ボタン以外・二重配置・不正なメニューを拒�
   }
 });
 
-test('CLIの番号操作でもメニュー番号と実行が一致する',()=>{
-  const r=spawnSync(process.execPath,['src/cli.js','interact','--project',project],{encoding:'utf8',input:'1\n3\n山田\n4\n30\n2\nq\n',timeout:5000});
+test('CLIの番号操作でもメニュー番号と実行が一致する',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'seda-menu-'));
+  try {
+  await writeFile(join(dir,'spec.yaml'),stringify(spec));
+  await writeFile(join(dir,'view.yaml'),stringify(view));
+  const r=spawnSync(process.execPath,['src/cli.js','interact','--design',join(dir,'spec.yaml'),'--view',join(dir,'view.yaml')],{encoding:'utf8',input:'1\n3\n山田\n4\n30\n2\nq\n',timeout:5000});
   assert.equal(r.status,0,r.stderr);
   assert.match(r.stdout,/名前と年齢を入力して登録を選んでください/);
   assert.match(r.stdout,/登録しました/);
+  } finally {await rm(dir,{recursive:true,force:true});}
 });

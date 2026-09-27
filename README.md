@@ -40,7 +40,7 @@ design-yaml/
         └── screen01.test.yaml
 ```
 
-`project.yaml` の `design_system_file`・`app_file`・`route_test_file`・`spec_file`・`view_file`・`test_file` は、このファイルのあるディレクトリを基準とする相対パス。画面IDは一覧・spec・viewで一致させる。
+`project.yaml` の `design_system_file`・`app_file`・`route_test_file`・`database_file`・`spec_file`・`view_file`・`test_file` は、このファイルのあるディレクトリを基準とする相対パス。画面IDは一覧・spec・viewで一致させる。
 
 ## 表示仕様（view）とDesign System
 
@@ -201,7 +201,7 @@ seda preview --interactive
 
 routesのあるprojectでは `/` を開始パスとし、`--path` で開始パスを変更できる。`--screen` はその画面に対応する最初のルートを選ぶ互換指定で、`--path` とは併用できない。遷移先も同じprojectから読み込む。必須の受信引数がある確認画面は直接開始せず、入力画面から遷移する。`--design` と `--view` の直接指定、`--device`、`--width` にも対応する。`--json` と `--test` は指定できない。
 
-入力値はセッション内のみ保持し、ファイルやDBには保存しない。processは同画面のactionsを呼び出し、YAMLに定義されたステップを模擬実行する。transitionステップでは画面を切り替えて値を引き継ぐ。成功とは設計シミュレーションが最後まで進んだ意味であり、実際の登録完了ではない。ワイヤーフレームの下には「画面メッセージ」「デバッグログ」「操作ガイド」を分けて表示する。入力エラー・完了文言は画面メッセージ、項目ID・検証ID・画面遷移・debugステップの文言はデバッグログに表示する。マウス操作には対応していない。
+入力項目の値はセッション内で保持する。database_fileを定義した場合は、dbステップでSQLiteを参照・更新できる。processは同画面のactionsを呼び出し、YAMLに定義されたステップを模擬実行する。transitionステップでは画面を切り替えて値を引き継ぐ。成功はアクションがエラーなく終了したことを表す。DBへの登録はoperation: create（旧形式ではdb.insert）を定義した場合に行われる。ワイヤーフレームの下には「画面メッセージ」「デバッグログ」「操作ガイド」を分けて表示する。入力エラー・完了文言は画面メッセージ、項目ID・検証ID・画面遷移・debugステップの文言はデバッグログに表示する。マウス操作には対応していない。
 
 ### 検証コマンド
 
@@ -307,6 +307,7 @@ route_test_file: routes.test.yaml
 | `main[].type` | `screen` |
 | `main[].spec_file` / `view_file` | routesを使う場合は両方必須 |
 | `main[].test_file` | verifyでは必須 |
+| `database_file` | 任意。SQLiteのテーブル・初期データを定義するYAML |
 | `route_test_file` | 任意。ルート解決と共通処理の期待値を定義するテスト |
 | `design_system_file` | 任意。共通スタイル定義 |
 
@@ -376,7 +377,7 @@ app内のfields・actions・validationsは画面と同じルールで記述す�
 
 `app.view.layout.sections` には `type: outlet` を必ず1つ置く。outletの前後には通常の共通セクションも置ける。共通メニューと画面メニューはその順で上部へ並べる。グリッド列数は共通側の指定を優先し、省略時は画面側を使う。項目・アクションなどのIDはappと各画面で分離するため、同じIDを使用できる。対話操作内部では共通IDに `app::` を付けるので、画面側のIDでこの接頭辞は使用しない。
 
-共通処理は起動・画面遷移・リセットで実行し、キー移動や再描画だけでは再実行しない。共通処理の検証に失敗した場合は対象画面の表示を中止する。共通処理がtransitionを返した場合は、そのパスを再解決して共通処理から実行し直す。循環するリダイレクトはエラー。遷移のたびに画面・共通項目の入力状態を作り直す。認証サーバーやDBとの通信、HTTPサーバー起動は行わず、YAMLに記述した処理をシミュレーションする。
+共通処理は起動・画面遷移・リセットで実行し、キー移動や再描画だけでは再実行しない。共通処理の検証に失敗した場合は対象画面の表示を中止する。共通処理がtransitionを返した場合は、そのパスを再解決して共通処理から実行し直す。循環するリダイレクトはエラー。遷移のたびに画面・共通項目の入力状態を作り直す。認証サーバーなどの外部サービスとの通信やHTTPサーバー起動は行わない。DB操作はローカルのSQLiteで実行する。
 
 未定義参照を検出するため、整合性検証では全画面の定義を事前に読み込む。実際の画面の生成・表示は共通処理が正常に終わってから行う。単体ファイル指定（`--design`）はproject・appを通さない単体検証用。
 
@@ -672,7 +673,7 @@ actions:
 
 呼び出し側は全引数を指定し、未知の引数は渡せない。入力元の型と引数の型は設計検証時に照合する。引数がなければアクションは `inputs: []`、ボタンは `inputs: {}` とする。
 
-参照ごとに取得元を1つだけ指定する。literalは文字列・有限数値・真偽値。null・配列・オブジェクトの固定値は未対応。実際の項目入力に不正な値が入るケースは、明示したValidationで検証する。静的な引数の型契約だけでは必須・数値チェックを自動追加しない。
+参照ごとに取得元を1つだけ指定する。literalは文字列・有限数値・真偽値。nullableなDBカラムとDB検索条件ではliteral: nullも使える。配列・オブジェクトの固定値は未対応。実際の項目入力に不正な値が入るケースは、明示したValidationで検証する。静的な引数の型契約だけでは必須・数値チェックを自動追加しない。
 
 以前のアクション側の参照マッピングと項目ID配列は互換用として読み込める。ただしその場合、ボタン側にinputsを追加しない。新旧形式の混在はエラーになる。
 
@@ -734,7 +735,7 @@ transitionはアクションの最後に置く。入力チェックで止まっ�
 | `expect.field_values` | 受信値とinputから確定した項目値の全体 |
 | `expect.process_calls` | `[{action: create_user, inputs: {name: 山田, age: 30}}]` のような処理名・引数の一覧 |
 
-テスト結果の `processes` は呼び出したアクション名の配列として維持する（画面直下の定義とは別）。processは引数を渡して呼び出し先のステップも模擬実行する。DB登録は行わない。Validationのtargetはアクション引数名。`{label}` はfield参照なら元項目のlabelを使い、それ以外なら引数名を使う。
+テスト結果の `processes` は呼び出したアクション名の配列として維持する（画面直下の定義とは別）。processは引数を渡して呼び出し先のステップも模擬実行する。DB登録は呼び出し先にoperation: create（旧形式ではdb.insert）がある場合に行う。Validationのtargetはアクション引数名。`{label}` はfield参照なら元項目のlabelを使い、それ以外なら引数名を使う。
 
 ```yaml
 design_tests:
@@ -774,7 +775,7 @@ seda interact --project examples/project.yaml
 - `empty` は未指定・`null`・空文字・空白のみの文字列でtrueを返す。必須チェックは `operator: empty` と `expected: false` で定義する。
 - `number` は有限の数値でtrueを返す。数値チェックは `operator: number` と `expected: true` で定義する。数値文字列・真偽値は数値へ変換しない。値が空でも数値チェックを省略しないため、年齢未指定時は `{validation: required, target: age}` と `{validation: is_number, target: age}` の両方が返る。
 - `on_error.action: show_message` は `{label}` を置換した検証メッセージを記録する。`on_error` を省略しても検証エラーと中断は発生するが、検証メッセージは記録しない。
-- `process` は同画面のアクションを呼び出すシミュレーション。YAMLで定義した検証・メッセージ・デバッグ・遷移を実行し、外部プログラムやDBアクセスは実行しない。
+- `process` は同画面のアクションを呼び出すシミュレーション。YAMLで定義した検証・メッセージ・デバッグ・遷移を実行し、外部プログラムは実行しない。dbステップはSQLiteに対して実行する。
 - `message` はメッセージを記録する。各ケースは独立し、保存データを共有しない。
 - ID重複、参照切れ、未対応のキー・演算子・ステップ型、空のテストや期待値はエラーにする。遷移先とその引数の型・必須項目はproject単位で検査する。
 
@@ -799,7 +800,7 @@ design_tests:
 
 | 期待値 | 内容 |
 | --- | --- |
-| `success` | 検証エラーで中断せず、最後のステップまで進んだか |
+| `success` | 検証・実行エラーで中断せず、正常終了したか（returnでの終了を含む） |
 | `validation_error` | `{validation: 検証ID, target: 項目ID}` のオブジェクト一覧 |
 | `processes` | 到達したprocessステップの処理名一覧 |
 | `messages` | 検証メッセージとmessageステップのメッセージ一覧 |
@@ -846,7 +847,7 @@ expect:
 - 正常な入力でユーザが登録され、完了メッセージが返る。
 - 入力エラーの場合には登録処理を実行しない。
 
-`screen01.test.yaml` で完了メッセージと登録ステップへの到達・中断を検証する。実際の登録データやDBの副作用は、このシミュレーションの検証範囲外。
+`screen01.test.yaml` で完了メッセージと登録ステップへの到達・中断を検証する。DB操作を追加した場合はexpect.databaseで更新後のデータも検証できる。
 
 ## 実装前に設計で明確にする事項
 
@@ -888,6 +889,279 @@ screen01:
 
 Tab・Shift+Tab・矢印キーで選び、Enterでアクションを実行する。番号入力モードではメニューから順に番号が付く。階層メニューやドロップダウンには未対応。
 
-サンプルを試すには `seda interact --project examples/menu-bar/project.yaml`、表示だけ確認するには `seda preview --project examples/menu-bar/project.yaml` を実行する。
+共通のホームメニューを試すには `seda interact --project examples/project.yaml` を実行する。
 
 ルート付きプロジェクトのpreview・interactでは、ワイヤーフレーム上部にブラウザ風の `URL [ / ]` 欄を表示する。遷移・リダイレクト・リセット後のパスが反映される。URL欄は表示専用で、開始パスは `--path` で指定する。
+
+
+## SQLiteによるDB参照・登録・更新
+
+SQLite実行には同梱依存の `better-sqlite3` を使用する。通常の `npm install` で導入される。更新したsedaを使うには `npm install -g /Users/yamanoura/github/seda` を実行する。
+
+### DBの寿命
+
+| 実行方法 | DBの扱い |
+| --- | --- |
+| `seda verify` | テストケースごとに新しいメモリDBを作成し、終了時に破棄する |
+| `seda interact` | 起動時にメモリDBを作成し、画面遷移後も共有する。終了時に破棄する |
+| `seda interact --db-file ./data.sqlite` | 指定ファイルへ保存し、終了・再起動後も保持する |
+| `seda preview` | 表示前の共通処理には一時的なメモリDBを使い、表示生成後に破棄する |
+
+`--db-file` はprojectを使うinteract（またはpreview --interactive）専用で、verifyや通常のpreviewではエラーになる。保存先はコマンド実行ディレクトリ基準。リセットの `r` は画面入力をリセットして共通処理を再実行するが、DBは消去しない。DBを初期状態から試す場合は、メモリモードで起動し直す。
+
+永続DBは初回作成時だけテーブルとseedを投入し、既存DBへseedを再投入しない。定義と既存DBのスキーマが違う場合はエラーとし、自動でテーブル変更・データ削除を行わない。別の保存先を指定して新しい定義を試せる。sedaの管理情報がない既存DBへの接続は未対応。
+
+### 実行可能なサンプル
+
+```sh
+# 既存プランから初期ポイントを取得してユーザ登録・登録件数更新を検証
+seda verify --project examples/sqlite/project.yaml
+
+# 起動中だけDBを保持する
+seda interact --project examples/sqlite/project.yaml
+
+# 終了後も保存する
+seda interact --project examples/sqlite/project.yaml --db-file ./examples/sqlite/data.sqlite
+```
+
+上記のコマンドはsedaリポジトリ直下で実行する。永続DBは `examples/sqlite/data.sqlite` に保存する。直接確認する場合は次を実行する。
+
+```sh
+sqlite3 ./examples/sqlite/data.sqlite
+```
+
+SQLite内では `.tables` でテーブル一覧、`SELECT * FROM users;` で登録データ、`.quit` で終了できる。
+
+名前・年齢を入力して確認・確定すると、usersへ登録し、plansのregistrationsを更新する。共通処理が登録済みユーザを取得してデバッグ欄に表示する。同じ名前の再登録は一意制約違反となる。サンプルは [examples/sqlite/project.yaml](examples/sqlite/project.yaml) を参照。
+
+### database.yaml：テーブルと初期データ
+
+project.yamlへ `database_file: database.yaml` を追加する。ファイルはproject.yamlのディレクトリ基準で読み込む。DB操作を含む画面は、単体の--design指定ではなく--projectで検証・操作する。
+
+```yaml
+database:
+  engine: sqlite
+  tables:
+    - id: users
+      columns:
+        - {id: id, type: integer, primary_key: true, generated: true}
+        - {id: name, type: text, unique: true}
+        - {id: age, type: integer}
+        - {id: active, type: boolean, default: true}
+        - {id: note, type: text, nullable: true}
+  seed:
+    users:
+      - {name: 初期ユーザ, age: 20}
+```
+
+型はtext・integer・number・boolean。integerはJavaScriptで安全に扱える整数、numberは有限数値。nullable省略時は非null。各テーブルには主キーが1つ必要で、generatedはinteger主キー専用。unique・default・外部キー `references: {table: plans, column: id}` に対応する。外部キーの参照先は同じ型の主キーまたはuniqueカラムにする。外部キー制約は接続時に有効化する。
+
+テーブル・カラム名は英字またはアンダースコアで始まる英数字・アンダースコア。sqlite_・_seda_で始まる名前は予約済み。複合主キー・複合一意制約・自動マイグレーションは未対応。SQLiteのSTRICTテーブルを生成する。
+
+### アクションのDBステップ
+
+DB操作は[Prisma ClientのCRUD](https://docs.prisma.io/docs/orm/v6/prisma-client/queries/crud)に近い `model / operation / where / data / select` で記述する。Prisma自体は導入せず、sedaが以下の操作をSQLite上で実行する。Prismaの全機能と互換ではない。
+
+`model` はdatabase.yamlの `tables[].id` を参照する。モデルの項目や型はdatabase.yamlで一度だけ定義する。各操作の値は、入力元を明示する `{input: ...}`・`{literal: ...}`・`{result: ...}` で指定する。
+
+```yaml
+# name・ageを受け取るアクション内のstepsの例
+- id: plan
+  type: db
+  model: plans
+  operation: findUnique
+  where:
+    id: {literal: 1}
+- id: saved
+  type: db
+  model: users
+  operation: create
+  data:
+    name: {input: name}
+    age: {input: age}
+    plan_id: {result: plan, column: id}
+    credit: {result: plan, column: initial_credit}
+- id: count_registration
+  type: db
+  model: plans
+  operation: update
+  where:
+    id: {result: plan, column: id}
+  data:
+    registrations:
+      add:
+        - {result: plan, column: registrations}
+        - {literal: 1}
+```
+
+| operation | 引数 | 結果 |
+| --- | --- | --- |
+| `findUnique` | where必須、select任意 | 1レコード。見つからなければnull |
+| `findMany` | where・select・orderBy・takeは任意 | レコードの配列。0件は空配列 |
+| `create` | data必須、select任意 | 作成したレコード。自動採番・既定値を含む |
+| `update` | where・data必須、select任意 | 更新後の1レコード。対象0件は `SEDA_RECORD_NOT_FOUND` エラー |
+| `updateMany` | 空でないwhere・data必須 | `{count: 更新件数}`。0件は正常終了 |
+
+`findUnique` と `update` のwhereには、主キーまたはuniqueカラムを少なくとも1つ、null以外で指定する。whereはカラムの等価比較をANDで結合する。`findMany` はwhereを省略できる。`updateMany` は誤った全件更新を避けるため空のwhereを受け付けない。
+
+`select: {id: true, name: true}` で返すカラムを選ぶ。省略時は全カラム。falseや関連モデルの選択には未対応。`orderBy: [{age: desc}, {id: asc}]` または `orderBy: {id: asc}` で並び順を指定し、省略時は主キー昇順。`take` は1〜10000、省略時1000件。orderByとtakeはfindMany専用。
+
+```yaml
+- id: users
+  type: db
+  model: users
+  operation: findMany
+  select: {id: true, name: true, age: true}
+  orderBy: {id: desc}
+  take: 20
+- id: show_users
+  type: debug
+  message: "登録済みユーザ:"
+  data: {result: users}
+```
+
+`{result: saved}` は結果全体、`{result: saved, column: id}` は返されたレコードの指定カラム。参照は同じアクション内の先行DBステップ、または返り値のあるprocessステップに限る。数値などの結果はprocessやtransitionのinputsにも渡せる。配列の個別行参照には未対応。
+
+数値計算はadd・subtract・multiply・divideへ2つの参照を指定する。SQL文字列やJavaScript式の直接記載は扱わない。値はSQLへバインドし、未定義参照や型の不一致は読み込み時にエラーにする。integerへの小数、スキップされたステップの結果参照、0除算などは実行時エラー。
+
+取得結果による分岐には `when: {result: plan, equals: null}` や `when: {result: plan, column: id, not_equals: null}` を指定できる。JOIN・DELETE・upsert・集約・繰り返し・Prismaのリレーション操作には未対応。
+
+#### 旧DB記法との互換性
+
+従来の `db.select / db.insert / db.update` も使用できる。新旧のキーを1ステップ内で混在させない。
+
+| 旧記法 | 対応する新記法 | 結果の違い |
+| --- | --- | --- |
+| db.select、table、mode: one | type: db、model、operation: findUnique | 旧形式はunique以外の条件も可能。複数行ならエラー |
+| db.select、mode: many、columns、order_by、limit | findMany、select、orderBy、take | いずれも配列 |
+| db.insert、values | create、data | 旧形式はchanges・last_insert_id、新形式はレコード |
+| db.update、values | updateMany、data | 旧形式はchanges、新形式はcount |
+
+旧形式のlast_insert_idはSQLiteのrowid。新形式では `{result: saved, column: id}` でモデルの主キーを直接取得する。
+
+### アクションの返り値
+
+`returns` で返り値の型を定義し、`type: return` の `value` で実際の値を返す。DBレコードは `returns: {model: users}` と書けばdatabase.yamlから型を継承でき、項目定義を繰り返す必要がない。
+
+```yaml
+# actionsの例。confirm_entryを呼ぶボタンからname・ageを渡す。
+- id: create_user
+  inputs:
+    - {id: name, type: text}
+    - {id: age, type: number}
+  returns: {model: users}
+  steps:
+    - id: saved
+      type: db
+      model: users
+      operation: create
+      data:
+        name: {input: name}
+        age: {input: age}
+        plan_id: {literal: 1}
+        credit: {literal: 100}
+    - id: return_user
+      type: return
+      value: {result: saved}
+
+- id: confirm_entry
+  inputs:
+    - {id: name, type: text}
+    - {id: age, type: number}
+  steps:
+    - id: register
+      type: process
+      action: create_user
+      inputs:
+        name: {input: name}
+        age: {input: age}
+    - id: log
+      type: debug
+      message: "登録したID:"
+      data: {result: register, column: id}
+```
+
+返り値の型は次の形式を使う。
+
+```yaml
+returns: {type: number}                        # text・number・boolean
+returns: {model: users, nullable: true}          # 1レコードまたはnull
+returns: {model: users, many: true}              # レコードの配列
+returns: {model: users, select: {id: true}}      # idだけを返す
+returns: {type: array, items: {type: number}}   # 数値配列の型
+returns:
+  type: object
+  properties:
+    id: {type: number}
+    registered: {type: boolean}
+```
+
+上の例は型の選択肢であり、1アクションにはreturnsを1つだけ指定する。モデル・オブジェクトの返却項目は宣言と完全一致させる。各型には `nullable: true` を付けられる。省略時はnullを許可しない。DB取得でnullになる可能性は実行時にも確認し、許可していないnullや実際の値の型が違えば `SEDA_RETURN_TYPE` エラーとなる。数値文字列を数値へ変換することはない。
+
+単一値は `value: {input: name}` や `value: {literal: 0}`。独自のオブジェクトは以下のように各項目の参照元を指定する。
+
+```yaml
+- id: return_summary
+  type: return
+  value:
+    object:
+      id: {result: saved, column: id}
+      registered: {literal: true}
+```
+
+returnはそのアクションの実行を終了し、呼び出し側は次のステップへ進む。`when` 付きreturnで早期終了できるが、returnsがあるアクションの最後には無条件のreturnが必要。返り値を返すアクションとその呼び出し先ではtransitionを使用できない。遷移は値を受け取った呼び出し側で行う。入力チェックで失敗した場合は値を返さず、呼び出し側も中断する。
+
+returnsを省略したアクションは返り値なしとして従来どおり実行できるが、そのprocess結果は参照できない。アクション引数と画面受信引数は引き続きtext・number・boolean。レコード全体を引数には渡さず、必要なcolumnを指定する。
+
+YAMLテストでは以下を比較できる。
+
+| 期待値 | 内容 |
+| --- | --- |
+| `expect.return_value` | テスト対象アクション自身の返り値。返り値なし・失敗時はnull |
+| `expect.action_results` | processステップIDと返り値の対応表。ネストした呼び出しは `アクションID.ステップID` |
+| `expect.action_error` | 返却型エラー等のコード配列。正常時は空配列 |
+
+```yaml
+# examples/sqliteのconfirm_entryを検証する例
+expect:
+  success: true
+  action_results:
+    register: {id: 1, name: 山田, age: 30, plan_id: 1, credit: 100}
+```
+
+期待値のオブジェクトも完全一致で比較する。同じアクション内の同じ呼び出しを複数回実行した場合、action_resultsには最後の成功結果を保持する。返り値の型エラー時は後続処理・遷移を停止し、実行中のトランザクションをロールバックする。action_resultsは途中の結果であり、保存済みデータはexpect.databaseで確認する。
+
+### トランザクション
+
+対話操作のボタン・メニュー実行を1つのトランザクションとして扱う。呼び出し先アクションと遷移先の共通処理も同じDBを共有し、その途中で検証・DB制約・画面の読み込みが失敗した場合は変更をロールバックする。検証テストではアクションとその呼び出し先をまとめてロールバックする。
+
+DBエラー時はsuccess: falseになり、db_errorへエラーコードを記録する。画面メッセージに原因を表示し、後続処理や遷移を停止する。db_resultsは実行途中の取得・更新結果の記録なので、最終的に保存された内容はexpect.databaseで確認する。
+
+### テストの初期DBと期待値
+
+```yaml
+design_tests:
+  - name: 初期プランに基づいて登録する
+    action: confirm_entry
+    screen_inputs: {name: 山田, age: 30}
+    input: {}
+    database:
+      plans:
+        - {id: 1, name: 特別, initial_credit: 500, registrations: 10}
+      users: []
+    expect:
+      success: true
+      database:
+        users:
+          - {name: 山田, credit: 500}
+        plans:
+          - {id: 1, registrations: 11}
+```
+
+ケース直下のdatabaseは、そのケース用の初期データ。指定したテーブルはseedを置き換え、省略したテーブルにはseedを使う。毎回新しいDBを作るので、ケース間でデータは引き継がない。
+
+expect.databaseは指定テーブルの全行を主キー昇順で比較する。比較するカラムは省略できるが、同じテーブルの各行には同じカラムを指定する。`users: []` はusersが0件であることを検証する。省略したテーブルは比較しない。
+
+`expect.db_results` は取得・更新結果を比較でき、トップレベルではステップID、呼び出し先では `アクションID.ステップID` をキーにする。同じ処理を複数回呼ぶ場合は最後の結果を保持する。`expect.db_error: [SQLITE_CONSTRAINT_UNIQUE]` のようにDBエラーコードも比較できる。
+
+route_testsでもケース直下のdatabaseとexpect.databaseに対応する。共通処理の前に初期化し、共通処理・リダイレクト終了後のDB状態を検証する。画面のdesign_testsとルートのroute_testsは別のケースとして独立したDBで実行する。verifyの全ルート事前確認ではseedから作った一時DBをルートごとに使う。

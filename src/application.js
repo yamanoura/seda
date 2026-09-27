@@ -1,3 +1,4 @@
+import {compileDatabase} from './database.js';
 import {dirname, resolve} from 'node:path';
 import {DefinitionError, readYaml, compileDesign, simulate, validateTransitions} from './verifier.js';
 
@@ -23,10 +24,11 @@ const prefix = id => `app::${id}`;
 
 export async function loadApplication(filename, {requireViews = true, requireTests = false} = {}) {
   const project = await readYaml(filename);
-  keys(project, ['main', 'design_system_file', 'routes', 'app_file', 'route_test_file'], filename);
+  keys(project, ['main', 'design_system_file', 'routes', 'app_file', 'route_test_file', 'database_file'], filename);
   const web = project.routes !== undefined || project.app_file !== undefined;
   const file = value => { text(value, filename); return resolve(dirname(filename), value); };
   if (project.design_system_file !== undefined) await readYaml(file(project.design_system_file));
+  const databaseSchema=project.database_file === undefined ? undefined : compileDatabase(await readYaml(file(project.database_file)));
   if (!Array.isArray(project.main) || !project.main.length) fail(filename, 'mainに1件以上の画面が必要です');
   const ids = new Set();
   for (const entry of project.main) {
@@ -51,21 +53,21 @@ export async function loadApplication(filename, {requireViews = true, requireTes
     }
     if (!routes.has('/')) fail(filename, 'ルートパス / の定義が必要です');
     for (const id of ids) if (![...routes.values()].includes(id)) fail(filename, `ルートがない画面: ${id}`);
-    app = compileApplication(await readYaml(file(project.app_file)));
+    app = compileApplication(await readYaml(file(project.app_file)),databaseSchema);
   }
   const screens = [];
   for (const entry of project.main) {
     const spec = await readYaml(file(entry.spec_file));
     const view = entry.view_file === undefined ? undefined : await readYaml(file(entry.view_file));
     if (view && !Object.hasOwn(view, entry.id)) fail(entry.view_file, `viewの画面IDが一致しません: ${entry.id}`);
-    const design = compileDesign(spec, entry.id);
+    const design = compileDesign(spec, entry.id, databaseSchema);
     if (web) for (const values of [design.fields, design.actions, design.validations, design.parameters]) {
       for (const id of values.keys()) if (id.startsWith('app::')) fail(entry.id, 'app:: は共通定義用の予約接頭辞です');
     }
     screens.push({screen:entry.id, spec, view, design, testFile:entry.test_file === undefined ? undefined : file(entry.test_file)});
   }
   const catalog = new Map(screens.map(s => [s.screen, s.design]));
-  catalog.routes = routes;
+  catalog.routes = routes; catalog.databaseSchema=databaseSchema;
   validateTransitions(catalog);
   if (app) {
     const all = new Map(catalog); all.routes = routes; all.set(Symbol('app'), app.design);
@@ -73,11 +75,11 @@ export async function loadApplication(filename, {requireViews = true, requireTes
   }
   if (project.route_test_file !== undefined && !web) fail(filename, 'route_test_fileにはroutesとapp_fileが必要です');
   screens.routeTestFile = project.route_test_file === undefined ? undefined : file(project.route_test_file);
-  screens.routes = routes; screens.app = app; screens.catalog = catalog;
+  screens.databaseSchema=databaseSchema; screens.routes = routes; screens.app = app; screens.catalog = catalog;
   return screens;
 }
 
-function compileApplication(document) {
+function compileApplication(document,databaseSchema) {
   keys(document, ['app'], 'app_file');
   const app = document.app;
   keys(app, ['description','inputs','fields','actions','validations','before_each','view'], 'app');
@@ -92,7 +94,7 @@ function compileApplication(document) {
   // 通常の呼び出し引数検証を、画面に出さない起動用ボタンにも適用する。
   const compiled = structuredClone(spec);
   compiled.fields.push({id:HOOK,type:'button',label:'共通処理',trigger:'click',action:before_each.action,inputs:before_each.inputs ?? {}});
-  const design = compileDesign({app:compiled}, 'app');
+  const design = compileDesign({app:compiled}, 'app',databaseSchema);
   if (![...design.actions.values()].every(a => a.typed)) fail('app.actions', 'inputsは {id, type} の配列で定義してください');
   keys(view, ['title','layout','appearance','responsive'], 'app.view');
   keys(view.layout, ['type','direction','columns','menu_bar','sections'], 'app.view.layout');
@@ -117,13 +119,17 @@ export function commonInputs(app, path, screen) {
 }
 
 // レンダリングのたびではなく、ルートへ入るたびに一度実行する。
-export function enterRoute(screens, path, received = {}) {
+export function enterRoute(screens,path,received={},database) {
+  const run=()=>enterRouteInternal(screens,path,received,database);
+  return database ? database.atomic(run) : run();
+}
+function enterRouteInternal(screens, path, received = {}, database) {
   const visited = new Set(), hooks = [];
   while (true) {
     if (visited.has(path)) fail('app.before_each', `リダイレクトが循環しています: ${[...visited, path].join(' → ')}`);
     visited.add(path);
     const screen = resolveRoute(screens, path);
-    const result = simulate(screens.app.design, screens.app.before_each.action, {}, commonInputs(screens.app, path, screen.screen), HOOK);
+    const result = simulate(screens.app.design, screens.app.before_each.action, {}, commonInputs(screens.app, path, screen.screen), HOOK, database);
     hooks.push({path, screen:screen.screen, ...result});
     if (!result.success) fail('app.before_each', `共通処理の検証エラーで画面表示を中止しました: ${result.messages.join(' / ') || JSON.stringify(result.validation_error)}`);
     if (!result.transition) return {screen, path, received, hooks};

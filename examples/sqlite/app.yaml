@@ -1,0 +1,62 @@
+app:
+  description: 全画面共通の処理とレイアウト
+  inputs:
+    - id: path
+      type: text
+      required: true
+    - id: screen
+      type: text
+      required: true
+  before_each:
+    action: prepare
+    inputs:
+      path:
+        input: path
+      screen:
+        input: screen
+  fields:
+    - id: home
+      type: button
+      label: ホーム
+      trigger: click
+      action: go_home
+      inputs: {}
+  actions:
+    - id: prepare
+      inputs:
+        - id: path
+          type: text
+        - id: screen
+          type: text
+      steps:
+        - id: users
+          type: db
+          operation: findMany
+          model: users
+          select:
+            id: true
+            name: true
+            age: true
+            credit: true
+        - id: list
+          type: debug
+          message: "登録済みユーザ:"
+          data:
+            result: users
+    - id: go_home
+      inputs: []
+      steps:
+        - id: home
+          type: transition
+          target: /
+  view:
+    title: ユーザ管理サービス
+    layout:
+      type: form
+      direction: vertical
+      sections:
+        - id: content
+          type: outlet
+      menu_bar:
+        fields:
+          - home
