@@ -1,4 +1,6 @@
 import PDFDocument from 'pdfkit';
+import { buildHumanReport } from './pdf-content.js';
+import { renderReport } from './pdf-layout.js';
 import { create as createFont } from 'fontkit';
 import { access, mkdir, open, rename, rm, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -19,7 +21,7 @@ export function readable(v, labels = {}, key) {
   return value(v);
 }
 
-export async function buildReport({project, design, screen, test, title} = {}) {
+async function buildTechnicalReport({project, design, screen, test, title} = {}) {
   let screens;
   if (design) {
     const spec = await readYaml(design);
@@ -138,6 +140,11 @@ export async function buildReport({project, design, screen, test, title} = {}) {
   return blocks;
 }
 
+export async function buildReport(options = {}) {
+  const technical = await buildTechnicalReport(options);
+  return buildHumanReport(options, technical);
+}
+
 async function fontOptions(path) {
   const candidates = path ? [path] : [process.env.SEDA_PDF_FONT, '/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc', '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc', 'C:/Windows/Fonts/meiryo.ttc'].filter(Boolean);
   for (const candidate of candidates) {
@@ -162,27 +169,7 @@ export async function writeReportPdf(blocks, {output='design.pdf',font} = {}) {
   // Attach an immediate rejection handler while synchronous layout is running.
   finished.catch(()=>{});
   try {
-    for (const [index,block] of blocks.entries()) {
-      if(block.kind==='page') doc.addPage();
-      const heading=['title','page','heading','subheading'].includes(block.kind);
-      const size=block.kind==='title'?23:block.kind==='page'?19:block.kind==='heading'?14:block.kind==='subheading'?12:block.kind==='detail'?9:10.5;
-      if(doc.y>doc.page.height-110 && heading) doc.addPage();
-      doc.fontSize(size).fillColor(heading?'#163b55':block.kind==='detail'?'#50616c':'#243440');
-      const options={lineGap:4,paragraphGap:5};
-      let height=doc.heightOfString(block.text,options)+size*0.4;
-      if (heading) {
-        for (let j=index+1;j<blocks.length;j++) {
-          if (['page','title','heading','subheading'].includes(blocks[j].kind)) break;
-          height+=doc.fontSize(blocks[j].kind==='detail'?9:10.5).heightOfString(blocks[j].text,options)+9;
-          if(block.kind !== 'subheading') break;
-        }
-        doc.fontSize(size);
-      }
-      const usable=doc.page.height-107;
-      if(height<usable && doc.y+height>doc.page.height-55) doc.addPage();
-      doc.text(block.text,options);
-      doc.moveDown(heading?0.5:0.3);
-    }
+    renderReport(doc, blocks);
     const range=doc.bufferedPageRange();
     for(let i=range.start;i<range.start+range.count;i++) {
       doc.switchToPage(i);
