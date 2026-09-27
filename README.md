@@ -4,7 +4,7 @@
 
 sedaは、設計を「読める文書」から「検証して動かせるデータ」へ変えるCLIツールです。
 
-YAMLで設計情報を定義し、整合性の検証・設計テスト・テキストワイヤーフレームの表示と操作を支援します。
+YAMLで画面・処理・データベースを定義し、整合性の検証、設計テスト、テキストワイヤーフレームの表示・操作、SQLiteによるデータの参照・登録・更新を行えます。
 
 名前の由来は「設計データ」。その響きに、ツールの役割を表す英語の意味を持たせた名称です。小文字の4文字で表記し、CLIでも入力しやすい名前としています。
 
@@ -18,15 +18,31 @@ YAML形式の設計書を元にAIがプログラムを実装できること、�
 
 設計方針の詳細は [YAMLによる構造化設計書 PoC](docs/design-principles.md) を参照。Structure・Behaviorをspec、Layout・Appearanceをview、具体的なスタイルをDesign Systemで管理する。
 
-## 現在のファイル
+## 現在できること
 
-- `design-yaml/project.yaml`: 設計ファイルをまとめる入口。
-- `design-yaml/design-system.yaml`: 配色・文字・余白・幅・部品サイズ・ブレークポイントの共通定義。
-- `design-yaml/features/screen01/screen01.spec.yaml`: ユーザ登録画面の項目・アクション・入力検証の定義。
-- `design-yaml/features/screen01/screen01.view.yaml`: 項目の意味的な配置・見た目の役割・メッセージの表示位置。
-- `design-yaml/features/screen01/screen01.test.yaml`: 正常系、必須・数値チェック、処理中断、境界値の5ケース。
+| 機能 | 内容 |
+| --- | --- |
+| `init` | 共通appと1画面のユーザ登録ひな形を作成 |
+| `verify` | 定義・参照・型を検査し、画面とルートのYAMLテストを実行 |
+| `preview` | 共通レイアウト、メニュー、URL欄を含むテキストワイヤーフレームを表示 |
+| `interact` | キーボードで入力・ボタン操作し、画面遷移と引数の受け渡しを確認 |
+| アクション | 入力検証、条件分岐、処理呼び出し、返り値、メッセージ・デバッグ出力 |
+| SQLite | テーブル・seed定義、検索・登録・更新、トランザクション、対話操作でのファイル保存 |
 
-設計をシミュレーションする検証CLIを実装済み。AIが生成したアプリケーションそのものを実行する機能は今後の対象。
+設計YAMLを実行する検証CLIを実装済み。AIが生成したアプリケーション自体の実行・テストや、ブラウザでの描画は未対応です。
+
+## リポジトリとサンプル
+
+| 場所 | 用途 |
+| --- | --- |
+| [design-yaml/](design-yaml/) | `init`が複製する1画面のひな形。入力検証・処理中断・正常系など5ケース。DBへの保存は行わない |
+| [examples/](examples/) | 入力・確認の2画面、共通ホームメニュー、ルートテストのサンプル |
+| [examples/sqlite/](examples/sqlite/) | 2画面の登録フローにSQLiteの参照・登録・更新とアクションの返り値を追加したサンプル |
+| [src/](src/) / [bin/](bin/) | CLI、設計検証・実行、テキストUI、SQLite処理と起動用ラッパー |
+| [test/](test/) | CLI・検証・画面操作・DBなどの自動テスト |
+| [docs/design-principles.md](docs/design-principles.md) | 設計方針と将来構想 |
+
+新規作成される設計の構成は次のとおり。
 
 ```text
 design-yaml/
@@ -71,12 +87,12 @@ Node.js 20以上が必要。起動時のNode.jsが古い場合はPATH内の対�
 
 ### 個人利用のインストール
 
-npmレジストリへの公開は不要。seda本体を `/Users/yamanoura/github/seda` に置き、依存パッケージを準備してからグローバルインストールする。
+npmレジストリへの公開は不要。sedaを配置したディレクトリで依存パッケージを準備し、グローバルインストールする。`/path/to/seda` は実際の配置先に置き換える。
 
 ```sh
-cd /Users/yamanoura/github/seda
+cd /path/to/seda
 npm ci
-npm install -g /Users/yamanoura/github/seda
+npm install -g .
 ```
 
 インストール後は、npmのグローバルコマンド用ディレクトリがPATHに含まれていれば、任意のディレクトリで実行できる。
@@ -91,7 +107,7 @@ seda --help
 sedaのプログラムを修正したら、次のコマンドで再インストールする。
 
 ```sh
-npm install -g /Users/yamanoura/github/seda
+npm install -g /path/to/seda
 ```
 
 依存パッケージも変更した場合は、先にseda本体のディレクトリで `npm ci` を実行する。起動中の `seda interact` は終了し、再起動する。次回のコマンド実行から修正後のプログラムを使用する。
@@ -114,7 +130,7 @@ cd my-design
 seda verify
 ```
 
-`init` は現在のユーザ登録サンプルを複製し、project・spec・view・test・Design Systemを作成する。作成先の親ディレクトリは存在している必要がある。既存のファイルやディレクトリは上書きせず、エラーにする。
+`init` は現在のユーザ登録サンプルを複製し、project・app・spec・view・test・Design Systemを作成する。作成先の親ディレクトリは存在している必要がある。既存のファイルやディレクトリは上書きせず、エラーにする。
 
 作成後はspecに項目・処理を定義し、viewに配置と見た目の役割、testに入力と期待値を記述する。画面を追加するときはファイルと画面IDを用意し、projectの `main` に参照、`routes` にURLパスを追加する。対応するキー・型・演算子は下記の対応仕様の範囲内とする。
 
@@ -166,6 +182,32 @@ responsive:
 `--device` は `desktop`（既定）または `mobile`。日本語の表示幅を考慮して枠を揃える。等幅フォントの端末での利用を想定し、絵文字の幅は端末によって差が生じる場合がある。
 
 プレビューは配置確認用であり、Design Systemの色・フォント・寸法、Appearanceのvariant・size、メッセージの動的表示、layoutの幅・余白トークン・画面全体のalignは描画しない。ブラウザ表示やアクセシビリティの検証は別途必要。
+
+### メニューバー
+
+viewの `layout.menu_bar.fields` にボタンIDを並べると、タイトルの下に横並びのメニューバーを表示する。ラベル・アクション・引数はspecの既存のbutton定義を使う。同じ項目をmenu_barとsectionsの両方には配置できない。本文のsectionsは1件以上必要。
+
+ボタンはspec側にも定義する。以下の例では `help_button` と `add_button` が必要。
+
+```yaml
+screen01:
+  title: ユーザ登録
+  layout:
+    type: form
+    direction: vertical
+    menu_bar:
+      fields: [help_button, add_button]
+    sections:
+      - id: user_info
+        title: ユーザ情報
+        fields: [name, age]
+```
+
+Tab・Shift+Tab・矢印キーで選び、Enterでアクションを実行する。番号入力モードではメニューから順に番号が付く。階層メニューやドロップダウンには未対応。
+
+共通のホームメニューを試すには `seda interact --project examples/project.yaml` を実行する。
+
+ルート付きプロジェクトのpreview・interactでは、ワイヤーフレーム上部にブラウザ風の `URL [ / ]` 欄を表示する。遷移・リダイレクト・リセット後のパスが反映される。URL欄は表示専用で、開始パスは `--path` で指定する。
 
 ### テキストワイヤーフレームを操作する
 
@@ -236,7 +278,7 @@ seda --version
 
 コマンド省略時は `verify`。project未指定時はカレントディレクトリの `project.yaml` のみを読み込む。なければ「現在のディレクトリにproject.yamlがありません」と表示し、終了コード2で終了する。`design-yaml/` や親ディレクトリは検索しない。verify・preview・interactで共通の規則。project内のファイル参照はprojectの所在ディレクトリ基準で解決する。CLIに渡すパスはカレントディレクトリ基準。
 
-`--design` と `--test` は `--project` と併用できない。projectモードは現在 `type: screen` のみ対応し、画面ID重複と参照ファイルの読み込みを確認する。遷移先の整合性確認のため全画面のspecを読み込む。routesがある場合は共通appと全画面のviewも読み込み、共通レイアウトとの組み合わせを検証する。`--screen` 指定時は選択画面の設計テストだけを実行するが、共通処理・ルート・全画面の静的な整合性検証は省略しない。Design Systemは省略可能。旧mainだけの形式ではverify時のviewも省略可能。
+`--design` と `--test` は `--project` と併用できない。projectモードは現在 `type: screen` のみ対応し、画面ID重複と参照ファイルの読み込みを確認する。遷移先の整合性確認のため全画面のspecを読み込む。routesがある場合は共通appと全画面のviewも読み込み、共通レイアウトとの組み合わせを検証する。`--screen` 指定時は選択画面の設計テストだけを実行するが、共通処理・ルート・全画面の静的な整合性検証は省略しない。`--screen` 指定時は `route_test_file` のテストケースを実行しない。Design Systemは省略可能。旧mainだけの形式ではverify時のviewも省略可能。
 
 例えば `expect.messages` を `別の文言` にすると、次のような不一致が表示される。仕様が正しければ期待値を、期待値が正しければ仕様を見直す。
 
@@ -251,14 +293,18 @@ FAIL [screen01] 正常入力
 
 終了コードは成功 `0`、期待値不一致 `1`、定義・読み込み・引数エラー `2`。不一致時は期待値と実際の値を表示する。`--json` は結果を標準出力にJSONで出力し、定義・読み込みエラーも `error.message` と `exitCode` を返す。引数自体の解析に失敗した場合は標準エラーへのテキスト出力となる。
 
-リポジトリ内では従来どおり以下も利用できる。
+リポジトリ直下でサンプルを試す場合は、`--project` を明示する。グローバルインストール前でも次のコマンドを使える。
 
 ```sh
+npm run verify -- --project design-yaml/project.yaml
 npm run verify -- --project examples/project.yaml
+npm run verify -- --project examples/sqlite/project.yaml
+node bin/yaml-design.cjs preview --project examples/project.yaml
+node bin/yaml-design.cjs interact --project examples/sqlite/project.yaml
 npm test
 ```
 
-グローバル登録せず使う場合は、`node /path/to/yaml-design-test1/src/cli.js verify --project /path/to/project.yaml` で実行できる。
+グローバル登録せず使う場合は、`node /path/to/seda/src/cli.js verify --project /path/to/project.yaml` で実行できる。
 
 ## YAMLの記載ルール
 
@@ -381,7 +427,7 @@ app内のfields・actions・validationsは画面と同じルールで記述す�
 
 未定義参照を検出するため、整合性検証では全画面の定義を事前に読み込む。実際の画面の生成・表示は共通処理が正常に終わってから行う。単体ファイル指定（`--design`）はproject・appを通さない単体検証用。
 
-条件付きのステップは、アクション引数と固定値を比較する `when` で指定できる。条件が一致した場合だけ実行し、不一致なら実行履歴にも含めない。参照先や型の不整合は条件に関係なく検出する。
+条件付きのステップは、アクション引数や先行ステップの結果と固定値を比較する `when` で指定できる。`equals` または `not_equals` のいずれかを使う。条件が一致した場合だけ実行し、不一致なら実行履歴にも含めない。参照先や型の不整合は条件に関係なく検出する。
 
 ```yaml
 # path引数が /old の場合だけリダイレクトする
@@ -431,6 +477,9 @@ route_tests:
 | 処理ステップ | `id`, `type: process`, `action` | actionは同画面のactionsに定義したアクションID。未定義ならエラー |
 | デバッグステップ | `id`, `type: debug`, `message` | デバッグログだけに表示する空でない文字列 |
 | メッセージステップ | `id`, `type: message`, `message` | messageは空でない文字列 |
+| 遷移ステップ | `id`, `type: transition`, `target` | routesがある場合はURLパス。`inputs`で受信引数を渡す |
+| DBステップ | `id`, `type: db`, `model`, `operation` | 検索・登録・更新。操作ごとの引数は後述のSQLite仕様を参照 |
+| 返却ステップ | `id`, `type: return`, `value` | アクションの`returns`で宣言した型の値を返す |
 | 検証定義 `validations[]` | `id`, `condition`, `message` | conditionはoperatorとexpected、messageはtemplate |
 
 `rules[].validation` は同画面の検証ID、`rules[].target` はそのアクションのinputsに含まれる引数名。`on_error` は任意で、指定する場合は `action: show_message` のみ対応する。テンプレートの変数は `{label}` のみ。
@@ -553,7 +602,7 @@ screen01:
 
 previewで必要なのは画面ID、`layout.type: form`、`layout.direction`、1件以上の `layout.sections`。各セクションは一意の `id` と1件以上の `fields` を持つ。specの全項目をsectionsまたはmenu_barに1回ずつ配置する。`title` は任意。列数・列結合・方向・寄せ方は前述のプレビュー対応仕様に従う。
 
-`appearance` はAI実装用の設計情報で、previewには反映しない。verifyではviewの構文と画面IDを確認するだけなので、配置の参照整合性は `seda preview` でも確認する。
+`appearance` はAI実装用の設計情報で、previewには反映しない。routesのあるprojectではverifyでも各画面と共通レイアウトを合成した配置を検証する。routesのない旧形式ではviewの構文・画面IDの確認にとどまるため、配置の参照整合性は `seda preview` で確認する。
 
 ### design-system.yaml：具体的なスタイル
 
@@ -668,7 +717,7 @@ actions:
 | --- | --- | --- |
 | ボタンのinputs | `field`・`input`・`literal` のいずれか | 現在の画面の受信引数 |
 | アクションのinputs | `{id, type}` の配列 | 値の取得元は書かない |
-| transition / processのinputs | `input`・`literal` のいずれか | 現在のアクションの引数 |
+| transition / processのinputs | `input`・`literal`・先行ステップの `result`（必要に応じて `column`） | 現在のアクションの引数 |
 | 項目のsource | `input`のみ | 現在の画面の受信引数 |
 
 呼び出し側は全引数を指定し、未知の引数は渡せない。入力元の型と引数の型は設計検証時に照合する。引数がなければアクションは `inputs: []`、ボタンは `inputs: {}` とする。
@@ -726,7 +775,9 @@ screen02:
 
 transitionはアクションの最後に置く。入力チェックで止まった場合、遷移しない。routesのあるprojectではtransitionのtargetに画面IDではなくパスを指定する。projectに登録された遷移先の存在、引数名、型、必須引数を検査する。`--design` / `--test` の直接指定では他画面を読み込まないため、画面をまたぐ検査は必ず `--project` で実行する。
 
-### 新しいテスト期待値
+遷移ステップ（`type: transition`）の `inputs` は省略可能で、省略時は空の対応表として扱う。遷移先に必須の受信引数がある場合は、省略すると引数不足のエラーになる。`inputs: null` や配列は使用できない。
+
+### 画面遷移・処理呼び出しのテスト期待値
 
 | キー | 内容 |
 | --- | --- |
@@ -801,7 +852,7 @@ design_tests:
 | 期待値 | 内容 |
 | --- | --- |
 | `success` | 検証・実行エラーで中断せず、正常終了したか（returnでの終了を含む） |
-| `validation_error` | `{validation: 検証ID, target: 項目ID}` のオブジェクト一覧 |
+| `validation_error` | `{validation: 検証ID, target: アクション引数名}` のオブジェクト一覧 |
 | `processes` | 到達したprocessステップの処理名一覧 |
 | `messages` | 検証メッセージとmessageステップのメッセージ一覧 |
 | `executed_steps` | 実行順のステップID一覧。呼び出し先は `アクションID.ステップID`。エラーで止まったステップも含む |
@@ -828,75 +879,9 @@ expect:
       target: name
 ```
 
-## 検証の流れ
-
-1. 設計YAMLとテストYAMLの形式・意味を定義する。
-2. 静的検証でYAML構文、必須項目、IDの重複、参照先の存在を確認する。
-3. 設計YAMLをAIに渡し、プログラムを実装する。
-4. テストYAMLをテストランナーで読み取り、実装プログラムへ入力して結果を照合する。
-5. 失敗したテストと設計上の不足を記録し、設計の修正と実装の修正を区別する。
-
-設計を解釈するだけの検証と、実装プログラムを実行するテストは別の検証とする。前者の成功だけではAIによる実装が正しいとは判定しない。
-
-## 最初の検証対象
-
-既存のユーザ登録画面を用いて、次を確認する。
-
-- 名前が空の場合に `{validation: required, target: name}` が返る。
-- 年齢が数値でない場合に `{validation: is_number, target: age}` が返る。
-- 正常な入力でユーザが登録され、完了メッセージが返る。
-- 入力エラーの場合には登録処理を実行しない。
-
-`screen01.test.yaml` で完了メッセージと登録ステップへの到達・中断を検証する。DB操作を追加した場合はexpect.databaseで更新後のデータも検証できる。
-
-## 実装前に設計で明確にする事項
-
-- バッチ仕様の構造と検証。
-- `create_user` の処理内容、保存先、出力、失敗時の挙動。
-- 実装を呼び出すインターフェースと、実データを扱うテストの初期化方法。
-- 独立したJSON Schema、設計規約を検査するDesign Lint、Data Entity、CRUD画面の仕様。
-
-## 達成条件
-
-- 不正な設計や参照を、対象箇所が分かるエラーとして検出できる。
-- AIが設計YAMLに基づいて実装したプログラムに対し、YAMLテストを自動実行できる。
-- 正常系・異常系・登録の副作用を検証でき、失敗時は期待値と実際の値を表示できる。
-- 設計と異なる実装を意図的に与えると、対応するテストが失敗する。
-- 実装の生成・修正に使用したAIへの指示、設計とテストの版、実行方法と結果を記録し、同じ版の実装に対して検証を再実行できる。
-
-この実験で確認するのは、定義した仕様とテスト範囲における実装可能性・検証可能性であり、テストで表現していない仕様まで正しいことを保証するものではない。
-# seda
-
-遷移ステップ（`type: transition`）の `inputs` は省略可能で、省略時は空の対応表として扱う。遷移先に必須の受信引数がある場合は、省略すると引数不足のエラーになる。`inputs: null` や配列は使用できない。
-
-### メニューバー
-
-viewの `layout.menu_bar.fields` にボタンIDを並べると、タイトルの下に横並びのメニューバーを表示する。ラベル・アクション・引数はspecの既存のbutton定義を使う。同じ項目をmenu_barとsectionsの両方には配置できない。本文のsectionsは1件以上必要。
-
-```yaml
-screen01:
-  title: ユーザ登録
-  layout:
-    type: form
-    direction: vertical
-    menu_bar:
-      fields: [help_button, add_button]
-    sections:
-      - id: user_info
-        title: ユーザ情報
-        fields: [name, age]
-```
-
-Tab・Shift+Tab・矢印キーで選び、Enterでアクションを実行する。番号入力モードではメニューから順に番号が付く。階層メニューやドロップダウンには未対応。
-
-共通のホームメニューを試すには `seda interact --project examples/project.yaml` を実行する。
-
-ルート付きプロジェクトのpreview・interactでは、ワイヤーフレーム上部にブラウザ風の `URL [ / ]` 欄を表示する。遷移・リダイレクト・リセット後のパスが反映される。URL欄は表示専用で、開始パスは `--path` で指定する。
-
-
 ## SQLiteによるDB参照・登録・更新
 
-SQLite実行には同梱依存の `better-sqlite3` を使用する。通常の `npm install` で導入される。更新したsedaを使うには `npm install -g /Users/yamanoura/github/seda` を実行する。
+SQLite実行には同梱依存の `better-sqlite3` を使用する。通常の `npm install` で導入される。更新したsedaを使うには `npm install -g /path/to/seda` を実行する。
 
 ### DBの寿命
 
@@ -1165,3 +1150,14 @@ expect.databaseは指定テーブルの全行を主キー昇順で比較する�
 `expect.db_results` は取得・更新結果を比較でき、トップレベルではステップID、呼び出し先では `アクションID.ステップID` をキーにする。同じ処理を複数回呼ぶ場合は最後の結果を保持する。`expect.db_error: [SQLITE_CONSTRAINT_UNIQUE]` のようにDBエラーコードも比較できる。
 
 route_testsでもケース直下のdatabaseとexpect.databaseに対応する。共通処理の前に初期化し、共通処理・リダイレクト終了後のDB状態を検証する。画面のdesign_testsとルートのroute_testsは別のケースとして独立したDBで実行する。verifyの全ルート事前確認ではseedから作った一時DBをルートごとに使う。
+
+## 今後の対象
+
+現在の `verify` は設計YAMLを解釈して実行する。SQLiteへの副作用は検証できるが、AIが生成した実装プログラムの正しさを判定する機能はまだない。
+
+- 生成した実装を呼び出すインターフェースと、YAMLテストを実装に対して実行するテストランナー。
+- 実装テスト用データの初期化と、設計と異なる実装がテストで失敗することの確認。
+- AIへの指示、設計・テスト・実装の版、実行方法と結果の記録による再現可能な検証。
+- バッチ仕様、独立したJSON Schema、設計規約を検査するDesign Lint、ブラウザ表示の検証。
+
+設計に不足が見つかったら先にYAMLへ明記し、設計の修正と実装の修正を区別する。テストで表現していない仕様まで正しいことを保証するものではない。
