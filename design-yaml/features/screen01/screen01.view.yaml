@@ -1,0 +1,38 @@
+screen01:
+  title: ユーザ登録
+  layout:
+    type: form
+    direction: vertical
+    width: medium
+    align: center
+    spacing: medium
+    sections:
+      - id: user_info
+        title: ユーザ情報
+        fields: [name, age]
+      - id: operations
+        direction: horizontal
+        fields: [add_button]
+        align: right
+  appearance:
+    fields:
+      - field_ref: name
+        size: medium
+      - field_ref: age
+        size: medium
+      - field_ref: add_button
+        variant: primary
+        size: medium
+  responsive:
+    desktop:
+      columns: 1
+    mobile:
+      columns: 1
+  feedback:
+    validation_errors:
+      placement: below_field
+      role: alert
+      show_text: true
+    completion_message:
+      placement: below_form
+      role: status

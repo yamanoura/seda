@@ -12,11 +12,14 @@ test('入力エラー文言と検証IDを別領域に表示する', () => {
   assert.doesNotMatch(debug, /名前を入力してください/);
 });
 
-test('成功メッセージと処理到達を分離し、制御文字を無効化する', () => {
-  const text = formatFeedback({ success: true, messages: ['登録しました。\x1b'], validation_error: [], processes: ['create_user'] });
+test('処理到達は自動表示せず、明示的なdebugログを表示する', () => {
+  const text = formatFeedback({ success: true, messages: ['登録しました。\x1b'], validation_error: [], processes: ['create_user'], debug_logs: ['登録処理を確認しました。\x1b'] });
   const [messages, debug] = text.split('--- デバッグログ ---');
   assert.match(messages, /登録しました/);
+  assert.doesNotMatch(messages, /成功/);
   assert.doesNotMatch(messages, /create_user/);
-  assert.match(debug, /処理到達（模擬）: create_user/);
+  assert.match(debug, /登録処理を確認しました/);
+  assert.doesNotMatch(messages, /登録処理を確認しました/);
+  assert.doesNotMatch(text, /処理到達|create_user/);
   assert.doesNotMatch(text, /\x1b/);
 });

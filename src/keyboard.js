@@ -5,7 +5,7 @@ const graphemes = text => Array.from(new Intl.Segmenter('ja', { granularity: 'gr
 const safe = text => String(text).replace(/[\x00-\x1f\x7f-\x9f]/gu, ' ');
 
 export function keyboardController(session) {
-  let focus = 0, editing = false, draft = [], cursor = 0, feedback = '', done = false;
+  let focus = 0, editing = false, draft = [], cursor = 0, feedback = session.entryFeedback ? formatFeedback(session.entryFeedback) : '', done = false;
   const field = () => session.fields[focus];
   const commit = () => {
     session.set(field().id, draft.join(''));
@@ -38,16 +38,18 @@ export function keyboardController(session) {
           return;
         }
         if (text === 'q') { done = true; return; }
-        if (text === 'r') { session.reset(); feedback = '入力をリセットしました。\n'; return; }
+        if (text === 'r') { session.reset(); focus = 0; feedback = '入力をリセットしました。\n' + (session.entryFeedback ? formatFeedback(session.entryFeedback) : ''); return; }
         if (key.name === 'tab') { move(key.shift ? -1 : 1); return; }
         if (['down', 'right'].includes(key.name)) { move(1); return; }
         if (['up', 'left'].includes(key.name)) { move(-1); return; }
         if (key.name === 'return' || key.name === 'enter') {
+          if (field().readonly) { feedback = '読み取り専用です。\n'; return; }
           if (field().type !== 'button') {
             draft = graphemes(session.get(field().id)); cursor = draft.length; editing = true;
           } else {
             const result = session.press(field().id);
             feedback = formatFeedback(result);
+            if (result.transition) focus = 0;
           }
         }
       } catch (error) { feedback = `${safe(error.message)}\n`; }

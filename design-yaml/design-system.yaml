@@ -1,0 +1,51 @@
+design_system:
+  id: default
+  # 寸法トークンはpx単位。line_heightのみ無単位。
+  colors:
+    surface: "#FFFFFF"
+    text: "#111827"
+    border: "#6B7280"
+    primary: "#1D4ED8"
+    on_primary: "#FFFFFF"
+    danger: "#B91C1C"
+    on_danger: "#FFFFFF"
+    success: "#166534"
+    focus: "#1D4ED8"
+  variants:
+    primary:
+      background: primary
+      foreground: on_primary
+    danger:
+      background: danger
+      foreground: on_danger
+  typography:
+    font_family: sans-serif
+    font_size: 16
+    line_height: 1.5
+  spacing:
+    small: 8
+    medium: 16
+    large: 24
+  widths:
+    medium: 480
+  sizes:
+    medium:
+      min_height: 44
+  breakpoints:
+    mobile:
+      min_width: 0
+    desktop:
+      min_width: 768
+  form:
+    padding: large
+    background: surface
+    foreground: text
+    border: border
+    focus: focus
+    label_position: top
+    fit_container: true
+  feedback:
+    validation_errors:
+      foreground: danger
+    completion_message:
+      foreground: success

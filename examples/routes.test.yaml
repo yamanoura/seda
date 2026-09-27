@@ -1,0 +1,18 @@
+route_tests:
+  - name: ルートから入力画面を表示
+    path: /
+    expect:
+      path: /
+      screen: screen01
+      debug_logs:
+        - 共通の表示前処理を実行しました。
+  - name: 確認パスでも共通処理を実行
+    path: /confirm
+    screen_inputs:
+      name: 山田
+      age: 30
+    expect:
+      path: /confirm
+      screen: screen02
+      debug_logs:
+        - 共通の表示前処理を実行しました。

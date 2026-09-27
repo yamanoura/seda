@@ -1,6 +1,6 @@
-import { dirname, resolve } from 'node:path';
+import {loadApplication, composeScreen, enterRoute} from './application.js';
 import stringWidth from 'string-width';
-import { compileDesign, DefinitionError, readYaml } from './verifier.js';
+import { compileDesign, DefinitionError } from './verifier.js';
 
 function requireValue(ok, path, message) {
   if (!ok) throw new DefinitionError(`${path}: ${message}`);
@@ -15,7 +15,8 @@ const pad = (text, width, align = 'left') => {
   return ' '.repeat(left) + text + ' '.repeat(gap - left);
 };
 
-export function renderPreview(spec, document, { screen, device = 'desktop', width = 60, values = {}, numbered = false, focused } = {}) {
+export function renderPreview(spec, document, { screen, device = 'desktop', width = 60, values = {}, numbered = false, focused, path } = {}) {
+  const address = path === undefined ? undefined : `URL [ ${label(path, 'path')} ]`;
   const design = compileDesign(spec, screen);
   const view = document?.[design.screenId];
   requireValue(view && typeof view === 'object', 'view', `画面が存在しません: ${design.screenId}`);
@@ -30,6 +31,21 @@ export function renderPreview(spec, document, { screen, device = 'desktop', widt
   const ids = new Set();
   const fieldIds = new Set();
   let itemNumber = 0;
+  let menu = '';
+  if (layout.menu_bar !== undefined) {
+    const bar = layout.menu_bar;
+    requireValue(bar && typeof bar === 'object' && !Array.isArray(bar), 'layout.menu_bar', 'マッピングが必要です');
+    requireValue(Object.keys(bar).every(key => key === 'fields'), 'layout.menu_bar', 'fieldsのみ指定できます');
+    requireValue(Array.isArray(bar.fields) && bar.fields.length > 0, 'layout.menu_bar.fields', '1件以上必要です');
+    menu = bar.fields.map(id => {
+      const field = design.fields.get(id);
+      requireValue(field?.type === 'button', 'layout.menu_bar.fields', `ボタン項目を指定してください: ${id}`);
+      requireValue(!fieldIds.has(id), 'layout.menu_bar.fields', `項目が重複しています: ${id}`);
+      fieldIds.add(id);
+      const prefix = (focused === undefined ? '' : focused === id ? '> ' : '  ') + (numbered ? `${++itemNumber}. ` : '');
+      return prefix + `[${label(field.label, `layout.menu_bar.${id}`)}]`;
+    }).join('  ');
+  }
   const sections = layout.sections.map((section, index) => {
     const path = `layout.sections[${index}]`;
     requireValue(typeof section?.id === 'string' && section.id && !ids.has(section.id), path, 'セクションIDが未指定または重複しています');
@@ -49,7 +65,7 @@ export function renderPreview(spec, document, { screen, device = 'desktop', widt
       const text = label(field.label, `${path}.${id}`);
       const prefix = (focused === undefined ? '' : focused === id ? '> ' : '  ') + (numbered ? `${++itemNumber}. ` : '');
       const value = Object.hasOwn(values, id) ? label(String(values[id]), `${path}.${id}.value`) : '________';
-      return prefix + (field.type === 'button' ? `[${text}]` : `${text} [${value}]`);
+      return prefix + (field.type === 'button' ? `[${text}]` : `${text} [${value}]${field.readonly ? ' (読取専用)' : ''}`);
     });
     return { align, span: Math.min(span, columns), lines: [
       ...(section.title === undefined ? [] : [label(section.title, `${path}.title`)]),
@@ -62,7 +78,7 @@ export function renderPreview(spec, document, { screen, device = 'desktop', widt
   const gap = 3;
   const cell = Math.max(Math.ceil((width - 4 - gap * (columns - 1)) / columns),
     ...sections.map(s => Math.ceil((Math.max(...s.lines.map(stringWidth)) - gap * (s.span - 1)) / s.span)));
-  const inner = Math.max(cell * columns + gap * (columns - 1), stringWidth(label(view.title ?? design.screenId, 'view.title')));
+  const inner = Math.max(cell * columns + gap * (columns - 1), stringWidth(label(view.title ?? design.screenId, 'view.title')), stringWidth(menu), stringWidth(address ?? ''));
   const rows = [];
   let row = [], used = 0;
   for (const section of sections) {
@@ -70,7 +86,7 @@ export function renderPreview(spec, document, { screen, device = 'desktop', widt
     row.push(section); used += section.span;
   }
   if (row.length) rows.push(row);
-  const body = [pad(view.title ?? design.screenId, inner), ' '.repeat(inner)];
+  const body = [pad(view.title ?? design.screenId, inner), ...(menu ? [pad(menu, inner), '-'.repeat(inner)] : []), ' '.repeat(inner)];
   rows.forEach((items, index) => {
     if (index) body.push(' '.repeat(inner));
     const height = Math.max(...items.map(s => s.lines.length));
@@ -78,28 +94,31 @@ export function renderPreview(spec, document, { screen, device = 'desktop', widt
       body.push(pad(items.map(s => pad(s.lines[line] ?? '', cell * s.span + gap * (s.span - 1), s.align)).join(' '.repeat(gap)), inner));
     }
   });
-  return ['+' + '-'.repeat(inner + 2) + '+', ...body.map(line => `| ${line} |`), '+' + '-'.repeat(inner + 2) + '+'].join('\n');
+  const border = '+' + '-'.repeat(inner + 2) + '+';
+  return [border, ...(address === undefined ? [] : [`| ${pad(address, inner)} |`, border]), ...body.map(line => `| ${line} |`), border].join('\n');
 }
 
 export async function loadPreviewScreens(filename, options = {}) {
-  const project = await readYaml(filename);
-  requireValue(Array.isArray(project?.main) && project.main.length, filename, 'mainに画面一覧が必要です');
-  const ids = project.main.map(e => e?.id);
-  requireValue(ids.every(id => typeof id === 'string' && id) && new Set(ids).size === ids.length, filename, '画面IDが未指定または重複しています');
-  const entries = project.main.filter(e => !options.screen || e.id === options.screen);
-  requireValue(entries.length > 0, filename, `画面が存在しません: ${options.screen}`);
-  const results = [];
-  for (const entry of entries) {
-    requireValue(entry.type === 'screen', filename, `未対応のtype: ${entry.type}`);
-    for (const key of ['spec_file', 'view_file']) requireValue(typeof entry[key] === 'string' && entry[key], filename, `${entry.id}.${key}が必要です`);
-    const spec = await readYaml(resolve(dirname(filename), entry.spec_file));
-    const view = await readYaml(resolve(dirname(filename), entry.view_file));
-    results.push({ screen: entry.id, spec, view });
-  }
-  return results;
+  const screens = await loadApplication(filename);
+  if (options.screen && !screens.some(s => s.screen === options.screen)) throw new DefinitionError(`画面が存在しません: ${options.screen}`);
+  if (!options.screen) return screens;
+  const selected = screens.filter(s => s.screen === options.screen);
+  selected.app=screens.app; selected.routes=screens.routes; selected.catalog=screens.catalog;
+  return selected;
 }
 
-export async function previewProject(filename, options) {
-  const screens = await loadPreviewScreens(filename, options);
-  return screens.map(({ screen, spec, view }) => ({ screen, text: renderPreview(spec, view, { ...options, screen }) }));
+export async function previewProject(filename, options = {}) {
+  const screens = await loadPreviewScreens(filename);
+  if (screens.app) {
+    const path = options.path ?? (options.screen ? [...screens.routes].find(([,id]) => id === options.screen)?.[0] : '/');
+    if (!path) throw new DefinitionError(`画面が存在しません: ${options.screen}`);
+    const entered=enterRoute(screens,path);
+    renderPreview(entered.screen.spec,entered.screen.view,{...options,screen:entered.screen.screen});
+    const {spec,view}=composeScreen(entered.screen,screens.app);
+    return [{screen:entered.screen.screen,path:entered.path,common_results:entered.hooks,text:renderPreview(spec,view,{...options,screen:entered.screen.screen,path:entered.path})}];
+  }
+  if (options.path) throw new DefinitionError('--pathにはproject.yamlのroutesが必要です');
+  const selected=screens.filter(s=>!options.screen || s.screen===options.screen);
+  if (!selected.length) throw new DefinitionError(`画面が存在しません: ${options.screen}`);
+  return selected.map(({screen,spec,view})=>({screen,text:renderPreview(spec,view,{...options,screen})}));
 }

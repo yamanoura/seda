@@ -1,0 +1,26 @@
+design_tests:
+  - name: 受信値を表示し確定する
+    action: confirm_entry
+    screen_inputs:
+      name: 山田太郎
+      age: 30
+    input: {}
+    expect:
+      success: true
+      debug_logs:
+        - 登録しました。
+      field_values:
+        name: 山田太郎
+        age: 30
+      processes:
+        - create_user
+      process_calls:
+        - action: create_user
+          inputs:
+            name: 山田太郎
+            age: 30
+      messages:
+        - 登録しました。
+      transition:
+        target: /
+        inputs: {}

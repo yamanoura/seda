@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, writeFile, cp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -17,6 +17,22 @@ test('別ディレクトリで初期化、検証、複数画面、絞り込み�
     assert.equal(cli('init', 'sample').status, 0);
     const projectPath = join(cwd, 'sample/project.yaml');
     const before = await readFile(projectPath, 'utf8');
+    // サブディレクトリに有効なひな形があっても暗黙に選ばない。
+    await cp(join(cwd, 'sample'), join(cwd, 'design-yaml'), { recursive: true });
+    for (const command of ['verify', 'preview', 'interact']) {
+      const missing = cli(command);
+      assert.equal(missing.status, 2);
+      assert.match(missing.stderr, /現在のディレクトリにproject.yamlがありません/);
+    }
+    const explicit = cli('verify', '--project', 'design-yaml/project.yaml');
+    assert.equal(explicit.status, 0, explicit.stderr);
+    for (const args of [['preview'], ['interact']]) {
+      const local = spawnSync(process.execPath, [executable, ...args], {
+        cwd: join(cwd, 'sample'), encoding: 'utf8', input: 'q\n', timeout: 5000,
+      });
+      assert.equal(local.status, 0, local.stderr);
+    }
+
     assert.equal(cli('init', 'sample').status, 2);
     assert.equal(await readFile(projectPath, 'utf8'), before);
     const check = cli('verify', '--project', projectPath, '--json');
@@ -34,6 +50,7 @@ test('別ディレクトリで初期化、検証、複数画面、絞り込み�
     await writeFile(specPath, stringify(spec));
     await writeFile(viewPath, stringify(view));
     project.main.push({ ...project.main[0], id: 'screen02' });
+    project.routes.push({path:'/second',screen:'screen02'});
     await writeFile(projectPath, stringify(project));
     assert.equal(JSON.parse(cli('-p', projectPath, '--json').stdout).total, 10);
     assert.equal(JSON.parse(cli('-p', projectPath, '--screen', 'screen02', '--json').stdout).total, 5);

@@ -1,0 +1,76 @@
+screen01:
+  description: ユーザ登録
+  fields:
+    - id: name
+      type: text
+      label: 名前
+    - id: age
+      type: number
+      label: 年齢
+    - id: add_button
+      type: button
+      label: 登録
+      trigger: click
+      action: add_entry
+      inputs:
+        name:
+          field: name
+        age:
+          field: age
+        mode:
+          literal: create
+  actions:
+    - id: add_entry
+      inputs:
+        - id: name
+          type: text
+        - id: age
+          type: number
+        - id: mode
+          type: text
+      steps:
+        - id: validate
+          type: validation
+          rules:
+            - validation: required
+              target: name
+            - validation: required
+              target: age
+            - validation: is_number
+              target: age
+          on_error:
+            action: show_message
+        - id: register
+          type: process
+          action: create_user
+          inputs:
+            name:
+              input: name
+            age:
+              input: age
+        - id: completed
+          type: message
+          message: 登録しました。
+    - id: create_user
+      inputs:
+        - id: name
+          type: text
+        - id: age
+          type: number
+      steps:
+        - id: register
+          type: debug
+          message: 登録しました。
+  validations:
+    - id: required
+      condition:
+        operator: empty
+        expected: false
+      message:
+        template: "{label}を入力してください。"
+    - id: is_number
+      condition:
+        operator: number
+        expected: true
+      message:
+        template: "{label}は数値で入力してください。"

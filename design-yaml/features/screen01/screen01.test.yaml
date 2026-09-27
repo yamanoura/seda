@@ -1,0 +1,58 @@
+design_tests:
+  - action: add_entry
+    input:
+      name: 山田太郎
+      age: 30
+    expect:
+      success: true
+      debug_logs:
+        - 登録しました。
+      processes:
+        - create_user
+      messages:
+        - 登録しました。
+      executed_steps:
+        - validate
+        - register
+        - create_user.register
+        - completed
+  - action: add_entry
+    input:
+      name: ""
+      age: 20
+    expect:
+      success: false
+      validation_error:
+        - validation: required
+          target: name
+      processes: []
+      messages:
+        - 名前を入力してください。
+      executed_steps:
+        - validate
+  - action: add_entry
+    input:
+      name: 山田
+    expect:
+      validation_error:
+        - validation: required
+          target: age
+        - validation: is_number
+          target: age
+      processes: []
+  - action: add_entry
+    input:
+      name: 山田
+      age: "30"
+    expect:
+      validation_error:
+        - validation: is_number
+          target: age
+      processes: []
+  - action: add_entry
+    input:
+      name: 山田
+      age: 0
+    expect:
+      success: true
+      validation_error: []

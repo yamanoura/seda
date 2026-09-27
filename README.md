@@ -31,6 +31,7 @@ YAML形式の設計書を元にAIがプログラムを実装できること、�
 ```text
 design-yaml/
 ├── project.yaml
+├── app.yaml                # 全画面共通の処理・レイアウト
 ├── design-system.yaml
 └── features/
     └── screen01/
@@ -39,7 +40,7 @@ design-yaml/
         └── screen01.test.yaml
 ```
 
-`project.yaml` の `design_system_file`・`spec_file`・`view_file`・`test_file` は、このファイルのあるディレクトリを基準とする相対パス。画面IDは一覧・spec・viewで一致させる。
+`project.yaml` の `design_system_file`・`app_file`・`route_test_file`・`spec_file`・`view_file`・`test_file` は、このファイルのあるディレクトリを基準とする相対パス。画面IDは一覧・spec・viewで一致させる。
 
 ## 表示仕様（view）とDesign System
 
@@ -115,7 +116,7 @@ seda verify
 
 `init` は現在のユーザ登録サンプルを複製し、project・spec・view・test・Design Systemを作成する。作成先の親ディレクトリは存在している必要がある。既存のファイルやディレクトリは上書きせず、エラーにする。
 
-作成後はspecに項目・処理を定義し、viewに配置と見た目の役割、testに入力と期待値を記述する。画面を追加するときはファイルと画面IDを用意し、projectの `main` に参照を追加する。対応するキー・型・演算子は下記の対応仕様の範囲内とする。
+作成後はspecに項目・処理を定義し、viewに配置と見た目の役割、testに入力と期待値を記述する。画面を追加するときはファイルと画面IDを用意し、projectの `main` に参照、`routes` にURLパスを追加する。対応するキー・型・演算子は下記の対応仕様の範囲内とする。
 
 ### テキストで画面イメージを確認する
 
@@ -187,20 +188,20 @@ seda preview --interactive
 | 編集中のEsc | 変更を取り消す |
 | 編集中の←→ / Home / End | 文字カーソルを移動 |
 | 編集中のBackspace / Delete | 文字を削除 |
-| 選択中の `r` | 全入力をリセット |
+| 選択中の `r` | 開始画面に戻り全入力をリセット |
 | 選択中の `q` / Ctrl+C / Ctrl+D | 終了 |
 
 移動順はviewのセクション・項目の定義順。矢印キーは画面上の距離に基づく移動ではなく、前後の項目へ移動する。編集では既存の値を引き継ぎ、全削除して確定すると空欄になる。日本語入力は端末のIMEで確定した文字を扱う。編集位置は `│` で示す。
 
 パイプなどTTY以外の入出力では従来の番号＋Enterによる行単位の操作に切り替える。画面が端末に収まらない場合はウィンドウを広げるか `--width`・`--device mobile` で調整する。
 
-名前・年齢を入力して登録ボタンを選ぶと、成功メッセージとprocessへの到達を表示する。不正な値なら検証エラーが表示され、そのまま入力を修正できる。入力中の `q` や `r` は通常の文字として扱う。
+名前・年齢を入力して登録ボタンを選ぶと、成功メッセージとYAMLのdebugステップで指定したログを表示する。不正な値なら検証エラーが表示され、そのまま入力を修正できる。入力中の `q` や `r` は通常の文字として扱う。
 
 対話UIではnumber項目の有限の十進数表記（符号・小数・指数表記を含む）を数値に変換する。空文字は空文字、数値でない入力は文字列のまま検証へ渡す。YAMLテスト内の文字列は従来どおり変換しない。
 
-複数画面のprojectは `--screen` で1画面を選択する。`--design` と `--view` の直接指定、`--device`、`--width` にも対応する。`--json` と `--test` は指定できない。
+routesのあるprojectでは `/` を開始パスとし、`--path` で開始パスを変更できる。`--screen` はその画面に対応する最初のルートを選ぶ互換指定で、`--path` とは併用できない。遷移先も同じprojectから読み込む。必須の受信引数がある確認画面は直接開始せず、入力画面から遷移する。`--design` と `--view` の直接指定、`--device`、`--width` にも対応する。`--json` と `--test` は指定できない。
 
-入力値はセッション内のみ保持し、ファイルやDBには保存しない。process本体・画面遷移は実行しない。成功とは設計シミュレーションが最後まで進んだ意味であり、実際の登録完了ではない。ワイヤーフレームの下には「画面メッセージ」「デバッグログ」「操作ガイド」を分けて表示する。入力エラー・完了文言は画面メッセージ、項目ID・検証ID・模擬処理への到達はデバッグログに表示する。マウス操作には対応していない。
+入力値はセッション内のみ保持し、ファイルやDBには保存しない。processは同画面のactionsを呼び出し、YAMLに定義されたステップを模擬実行する。transitionステップでは画面を切り替えて値を引き継ぐ。成功とは設計シミュレーションが最後まで進んだ意味であり、実際の登録完了ではない。ワイヤーフレームの下には「画面メッセージ」「デバッグログ」「操作ガイド」を分けて表示する。入力エラー・完了文言は画面メッセージ、項目ID・検証ID・画面遷移・debugステップの文言はデバッグログに表示する。マウス操作には対応していない。
 
 ### 検証コマンド
 
@@ -233,9 +234,9 @@ seda --help
 seda --version
 ```
 
-コマンド省略時は `verify`。project未指定時はカレントディレクトリの `project.yaml`、`design-yaml/project.yaml` の順に検索する。親ディレクトリは検索しない。project内のファイル参照はprojectの所在ディレクトリ基準で解決する。CLIに渡すパスはカレントディレクトリ基準。
+コマンド省略時は `verify`。project未指定時はカレントディレクトリの `project.yaml` のみを読み込む。なければ「現在のディレクトリにproject.yamlがありません」と表示し、終了コード2で終了する。`design-yaml/` や親ディレクトリは検索しない。verify・preview・interactで共通の規則。project内のファイル参照はprojectの所在ディレクトリ基準で解決する。CLIに渡すパスはカレントディレクトリ基準。
 
-`--design` と `--test` は `--project` と併用できない。projectモードは現在 `type: screen` のみ対応し、画面ID重複と参照ファイルの読み込みを確認する。`--screen` 指定時は選択画面のspec・test・viewのみを読み込み、Design Systemは共通で読み込む。viewとDesign Systemは省略可能。指定した場合はYAML構文を確認し、viewの画面IDも確認する。内容の完全なSchema検証や描画は行わない。
+`--design` と `--test` は `--project` と併用できない。projectモードは現在 `type: screen` のみ対応し、画面ID重複と参照ファイルの読み込みを確認する。遷移先の整合性確認のため全画面のspecを読み込む。routesがある場合は共通appと全画面のviewも読み込み、共通レイアウトとの組み合わせを検証する。`--screen` 指定時は選択画面の設計テストだけを実行するが、共通処理・ルート・全画面の静的な整合性検証は省略しない。Design Systemは省略可能。旧mainだけの形式ではverify時のviewも省略可能。
 
 例えば `expect.messages` を `別の文言` にすると、次のような不一致が表示される。仕様が正しければ期待値を、期待値が正しければ仕様を見直す。
 
@@ -253,7 +254,7 @@ FAIL [screen01] 正常入力
 リポジトリ内では従来どおり以下も利用できる。
 
 ```sh
-npm run verify
+npm run verify -- --project examples/project.yaml
 npm test
 ```
 
@@ -273,7 +274,7 @@ npm test
 - 機能・検証ルールはspec、配置はview、具体的なスタイルはDesign System、期待値はtestに記載する。
 - project・spec・testには対応表にないキーを追加しない。背景や理由はコメント（`#`）や別のMarkdownに記載する。`rationale` などの独自キーは現行specでは未対応。
 
-### project.yaml：検証対象の一覧
+### project.yaml：URLと画面・共通appの対応
 
 ```yaml
 design_system_file: design-system.yaml
@@ -283,32 +284,155 @@ main:
     spec_file: features/screen01/screen01.spec.yaml
     view_file: features/screen01/screen01.view.yaml
     test_file: features/screen01/screen01.test.yaml
+  - id: screen02
+    type: screen
+    spec_file: features/screen02/screen02.spec.yaml
+    view_file: features/screen02/screen02.view.yaml
+    test_file: features/screen02/screen02.test.yaml
+app_file: app.yaml
+routes:
+  - path: /
+    screen: screen01
+  - path: /confirm
+    screen: screen02
+route_test_file: routes.test.yaml
 ```
 
-| キー | 必須 | ルール |
-| --- | --- | --- |
-| `main` | はい | 1件以上の画面定義 |
-| `main[].id` | はい | 重複しない画面ID |
-| `main[].type` | はい | 現在は `screen` のみ |
-| `main[].spec_file` / `test_file` | verifyでは必須 | projectの場所を基準とするファイルパス |
-| `main[].view_file` | preview・interactでは必須 | verifyでは省略可能 |
-| `design_system_file` | いいえ | 共通スタイル定義のパス |
+| 定義 | 内容 |
+| --- | --- |
+| `app_file` | 全画面で実行する共通YAML。routesを使う場合は必須 |
+| `routes[].path` | `/` から始まる固定パス。重複不可。`/` の定義が必須 |
+| `routes[].screen` | mainに登録した画面ID。すべての画面に1つ以上のルートが必要 |
+| `main` | 画面ID・spec/view/testファイルの一覧。並び順は開始画面に影響しない |
+| `main[].type` | `screen` |
+| `main[].spec_file` / `view_file` | routesを使う場合は両方必須 |
+| `main[].test_file` | verifyでは必須 |
+| `route_test_file` | 任意。ルート解決と共通処理の期待値を定義するテスト |
+| `design_system_file` | 任意。共通スタイル定義 |
+
+`routes`・`app_file`のない既存projectは互換動作し、main先頭の画面から起動する。新しい`init`はURLと共通appを持つ形式で作成する。固定パスの完全一致のみ対応し、クエリ・動的パラメータ・末尾のスラッシュ（`/`以外）は未対応。
+
+### app.yaml：共通処理と共通レイアウト
+
+```yaml
+app:
+  description: 全画面共通の処理とレイアウト
+  inputs:
+    - id: path
+      type: text
+      required: true
+    - id: screen
+      type: text
+      required: true
+  before_each:
+    action: prepare
+    inputs:
+      path:
+        input: path
+      screen:
+        input: screen
+  fields:
+    - id: home
+      type: button
+      label: ホーム
+      trigger: click
+      action: go_home
+      inputs: {}
+  actions:
+    - id: prepare
+      inputs:
+        - id: path
+          type: text
+        - id: screen
+          type: text
+      steps:
+        - id: prepare_log
+          type: debug
+          message: 共通の表示前処理を実行しました。
+    - id: go_home
+      inputs: []
+      steps:
+        - id: home
+          type: transition
+          target: /
+  view:
+    title: ユーザ管理サービス
+    layout:
+      type: form
+      direction: vertical
+      sections:
+        - id: content
+          type: outlet
+      menu_bar:
+        fields:
+          - home
+```
+
+起動・遷移の順序は「パス解決 → before_each実行 → outletへ画面を挿入」。`seda interact` と `seda preview` は `/` から開始する。`seda preview --path /confirm` は確認パスのレイアウトを確認できる。interactで必須の受信引数を持つ画面を直接開くことはできないため、入力画面から値を渡して遷移する。
+
+`before_each.action` は同じapp内のアクションID、`before_each.inputs` はその呼び出し引数。appの受信引数として定義した `path` と `screen` には、解決済みのパスと画面IDをsedaが渡す。いずれも型はtext。使用しなければappのinputsから省略できる。共通アクションのinputsは `{id, type}` の配列形式にする。
+
+app内のfields・actions・validationsは画面と同じルールで記述する。共通アクションからprocessで呼べるのは同じapp内のアクション。画面への移動はパスへのtransitionを使う。app内に必要な項目がない場合は `fields: []` でよい。
+
+`app.view.layout.sections` には `type: outlet` を必ず1つ置く。outletの前後には通常の共通セクションも置ける。共通メニューと画面メニューはその順で上部へ並べる。グリッド列数は共通側の指定を優先し、省略時は画面側を使う。項目・アクションなどのIDはappと各画面で分離するため、同じIDを使用できる。対話操作内部では共通IDに `app::` を付けるので、画面側のIDでこの接頭辞は使用しない。
+
+共通処理は起動・画面遷移・リセットで実行し、キー移動や再描画だけでは再実行しない。共通処理の検証に失敗した場合は対象画面の表示を中止する。共通処理がtransitionを返した場合は、そのパスを再解決して共通処理から実行し直す。循環するリダイレクトはエラー。遷移のたびに画面・共通項目の入力状態を作り直す。認証サーバーやDBとの通信、HTTPサーバー起動は行わず、YAMLに記述した処理をシミュレーションする。
+
+未定義参照を検出するため、整合性検証では全画面の定義を事前に読み込む。実際の画面の生成・表示は共通処理が正常に終わってから行う。単体ファイル指定（`--design`）はproject・appを通さない単体検証用。
+
+条件付きのステップは、アクション引数と固定値を比較する `when` で指定できる。条件が一致した場合だけ実行し、不一致なら実行履歴にも含めない。参照先や型の不整合は条件に関係なく検出する。
+
+```yaml
+# path引数が /old の場合だけリダイレクトする
+- id: redirect
+  type: transition
+  target: /
+  when:
+    input: path
+    equals: /old
+```
+
+### routes.test.yaml：ルートと共通処理のテスト
+
+```yaml
+route_tests:
+  - name: ルートから入力画面を表示
+    path: /
+    expect:
+      path: /
+      screen: screen01
+      debug_logs:
+        - 共通の表示前処理を実行しました。
+  - name: 確認パスでも共通処理を実行
+    path: /confirm
+    screen_inputs:
+      name: 山田
+      age: 30
+    expect:
+      path: /confirm
+      screen: screen02
+      debug_logs:
+        - 共通の表示前処理を実行しました。
+```
+
+`seda verify` は画面のdesign_testsとroute_testsを実行する。route_testsの `screen_inputs` は対象画面へ渡す値で、省略時は空。`expect` は最終的な `path`・`screen` と、共通処理から出た `messages`・`debug_logs` を比較する。リダイレクトがあれば途中の共通処理の出力も順番に含む。画面アクションのテストは従来どおりdesign_testsで記述する。
 
 ### spec.yaml：項目・処理・入力チェック
 
-画面の下には `fields`・`actions`・`validations` の配列を置く。`fields` と `actions` は1件以上必要。入力チェックがなければ `validations: []` とする。`description` は任意。
+画面の下には `fields`・`actions`・`validations` の配列を置く。`fields` と `actions` は1件以上必要。入力チェックがなければ `validations: []` とするか省略できる。`description` は任意。
 
 | 定義 | 必須キー | 対応値・参照先 |
 | --- | --- | --- |
-| 項目 `fields[]` | `id`, `type`, `label` | typeは `text`, `number`, `button` |
-| ボタン | 上記＋`trigger`, `action` | triggerは `click`、actionは同画面のアクションID |
-| アクション `actions[]` | `id`, `inputs`, `steps` | inputsはボタン以外の項目ID配列、stepsは1件以上 |
+| 項目 `fields[]` | `id`, `label` と型の定義元 | `source.input` がある場合はtypeを継承。それ以外のtypeは `text`, `number`, `button` |
+| ボタン | 上記＋`trigger`, `action`, `inputs` | triggerは `click`、actionは同画面のアクションID |
+| アクション `actions[]` | `id`, `inputs`, `steps` | inputsは `{id, type}` の配列（型はtext・number・boolean）、stepsは1件以上 |
 | 検証ステップ | `id`, `type: validation`, `rules` | rulesは1件以上の `{validation, target}` |
-| 処理ステップ | `id`, `type: process`, `action` | actionは記録する処理名。処理本体の存在確認・実行はしない |
+| 処理ステップ | `id`, `type: process`, `action` | actionは同画面のactionsに定義したアクションID。未定義ならエラー |
+| デバッグステップ | `id`, `type: debug`, `message` | デバッグログだけに表示する空でない文字列 |
 | メッセージステップ | `id`, `type: message`, `message` | messageは空でない文字列 |
 | 検証定義 `validations[]` | `id`, `condition`, `message` | conditionはoperatorとexpected、messageはtemplate |
 
-`rules[].validation` は同画面の検証ID、`rules[].target` はそのアクションのinputsに含まれる項目ID。`on_error` は任意で、指定する場合は `action: show_message` のみ対応する。テンプレートの変数は `{label}` のみ。
+`rules[].validation` は同画面の検証ID、`rules[].target` はそのアクションのinputsに含まれる引数名。`on_error` は任意で、指定する場合は `action: show_message` のみ対応する。テンプレートの変数は `{label}` のみ。
 
 次は、そのまま保存できるユーザ登録仕様の例。
 
@@ -327,9 +451,22 @@ screen01:
       label: 登録
       trigger: click
       action: add_entry
+      inputs:
+        name:
+          field: name
+        age:
+          field: age
+        mode:
+          literal: create
   actions:
     - id: add_entry
-      inputs: [name, age]
+      inputs:
+        - id: name
+          type: text
+        - id: age
+          type: number
+        - id: mode
+          type: text
       steps:
         - id: validate
           type: validation
@@ -345,8 +482,23 @@ screen01:
         - id: register
           type: process
           action: create_user
+          inputs:
+            name:
+              input: name
+            age:
+              input: age
         - id: completed
           type: message
+          message: 登録しました。
+    - id: create_user
+      inputs:
+        - id: name
+          type: text
+        - id: age
+          type: number
+      steps:
+        - id: register
+          type: debug
           message: 登録しました。
   validations:
     - id: required
@@ -362,6 +514,13 @@ screen01:
       message:
         template: "{label}は数値で入力してください。"
 ```
+
+
+`type: process` の `action` は同じ画面の `actions` に定義する。呼び出し先の `inputs` は受け取る引数の `{id, type}` 配列、呼び出し側の `inputs` は渡す値の対応表とする。引数がなければ定義側を `inputs: []`、呼び出し側を `inputs: {}`（または省略）とする。呼び出し先はボタンに直接結び付いていなくてもよく、定義順にも依存しない。
+
+未定義参照・引数の不足や余剰・型の不一致・IDの重複・循環呼び出しは、実行経路に到達するかに関係なく設計読込時にエラーとなる。`seda verify`・`seda preview`・`seda interact` は終了コード2で終了する。以前の画面直下の `processes` 定義は廃止したため、`actions` に移して `steps` を記述する。
+
+呼び出し先の検証でエラーになった場合や画面遷移した場合は、親アクションの後続ステップも停止する。`type: message` は画面メッセージ、`type: debug` はデバッグログへ出力する。`debug` は保存や登録を実行する命令ではなく、シミュレーション中の確認用ログである。
 
 ### view.yaml：配置と意味的な見た目
 
@@ -391,7 +550,7 @@ screen01:
       columns: 1
 ```
 
-previewで必要なのは画面ID、`layout.type: form`、`layout.direction`、1件以上の `layout.sections`。各セクションは一意の `id` と1件以上の `fields` を持つ。specの全項目を1回ずつ配置する。`title` は任意。列数・列結合・方向・寄せ方は前述のプレビュー対応仕様に従う。
+previewで必要なのは画面ID、`layout.type: form`、`layout.direction`、1件以上の `layout.sections`。各セクションは一意の `id` と1件以上の `fields` を持つ。specの全項目をsectionsまたはmenu_barに1回ずつ配置する。`title` は任意。列数・列結合・方向・寄せ方は前述のプレビュー対応仕様に従う。
 
 `appearance` はAI実装用の設計情報で、previewには反映しない。verifyではviewの構文と画面IDを確認するだけなので、配置の参照整合性は `seda preview` でも確認する。
 
@@ -418,7 +577,7 @@ design_system:
 
 ### test.yaml：入力と期待値
 
-`design_tests` は1件以上の配列。各ケースは `action`・`input`・空でない `expect` が必須で、`name` は任意。`input` のキーは対象アクションのinputsに含まれる項目IDのみ。値は文字列・数値・真偽値・nullに対応し、未指定の項目は未入力として扱う。
+`design_tests` は1件以上の配列。各ケースは `action`・`input`・空でない `expect` が必須で、`name` は任意。`input` のキーは画面の編集可能な項目ID。アクション引数を直接上書きせず、入力元の項目値を指定する。受信値は別の `screen_inputs` に記載する。値は文字列・数値・真偽値・nullに対応し、未指定の項目は未入力として扱う。
 
 ```yaml
 design_tests:
@@ -432,7 +591,7 @@ design_tests:
       validation_error: []
       processes: [create_user]
       messages: [登録しました。]
-      executed_steps: [validate, register, completed]
+      executed_steps: [validate, register, create_user.register, completed]
   - name: 名前が空なら登録しない
     action: add_entry
     input:
@@ -450,6 +609,162 @@ design_tests:
 
 エラーが出ることだけでなく、`processes: []` で登録処理に進まないことも確認する。比較する期待値の型と意味は次の対応仕様を参照。
 
+## 呼び出し側の値指定・アクションの引数契約・画面遷移
+
+ボタン側の `inputs` は渡す値とその取得元、アクション側の `inputs` は受け取る引数の名前・型を定義する。これは「値の割り当て」と「インターフェース契約」であり、役割の異なる記述。同一アクションを複数ボタンから呼び出せる。
+
+```yaml
+fields:
+  # name・age項目の定義は省略
+  - id: add_button
+    type: button
+    label: 登録
+    trigger: click
+    action: add_entry
+    inputs:
+      name: {field: name}
+      age: {field: age}
+      mode: {literal: create}
+  - id: draft_button
+    type: button
+    label: 下書き
+    trigger: click
+    action: add_entry
+    inputs:
+      name: {field: name}
+      age: {field: age}
+      mode: {literal: draft}
+actions:
+  - id: add_entry
+    inputs:
+      - id: name
+        type: text
+      - id: age
+        type: number
+      - id: mode
+        type: text
+    steps:
+      - id: save
+        type: process
+        action: save_user
+        inputs:
+          name: {input: name}
+          age: {input: age}
+          mode: {input: mode}
+  - id: save_user
+    description: 指定されたモードでユーザを保存する。
+    inputs:
+      - {id: name, type: text}
+      - {id: age, type: number}
+      - {id: mode, type: text}
+    steps:
+      - id: log
+        type: debug
+        message: ユーザ保存処理に到達しました。
+```
+
+| 記載場所 | 記載内容 | `input` の参照範囲 |
+| --- | --- | --- |
+| ボタンのinputs | `field`・`input`・`literal` のいずれか | 現在の画面の受信引数 |
+| アクションのinputs | `{id, type}` の配列 | 値の取得元は書かない |
+| transition / processのinputs | `input`・`literal` のいずれか | 現在のアクションの引数 |
+| 項目のsource | `input`のみ | 現在の画面の受信引数 |
+
+呼び出し側は全引数を指定し、未知の引数は渡せない。入力元の型と引数の型は設計検証時に照合する。引数がなければアクションは `inputs: []`、ボタンは `inputs: {}` とする。
+
+参照ごとに取得元を1つだけ指定する。literalは文字列・有限数値・真偽値。null・配列・オブジェクトの固定値は未対応。実際の項目入力に不正な値が入るケースは、明示したValidationで検証する。静的な引数の型契約だけでは必須・数値チェックを自動追加しない。
+
+以前のアクション側の参照マッピングと項目ID配列は互換用として読み込める。ただしその場合、ボタン側にinputsを追加しない。新旧形式の混在はエラーになる。
+
+### 同じアクションを複数のボタンからテストする
+
+ケースに `action` と `button` の両方を指定する。`input` は編集可能な画面項目の値であり、ボタンに定義された固定値を上書きするものではない。
+
+```yaml
+design_tests:
+  - name: 下書きボタンはdraftを渡す
+    action: add_entry
+    button: draft_button
+    input: {name: 山田太郎, age: 30}
+    expect:
+      process_calls:
+        - action: save_user
+          inputs: {name: 山田太郎, age: 30, mode: draft}
+```
+
+呼び出し元が1つならbuttonを省略できる。複数ある場合は暗黙に選ばず定義エラーにする。buttonとactionの不一致もエラー。Validationメッセージの `{label}` は選択したボタンの参照元フィールドのlabelを使う。
+
+### 受信値から項目の型を継承する
+
+```yaml
+screen02:
+  inputs:
+    - id: name
+      type: text
+      required: true
+    - id: age
+      type: number
+      required: true
+  fields:
+    - id: name
+      label: 名前
+      source:
+        input: name
+      readonly: true
+    - id: age
+      label: 年齢
+      source:
+        input: age
+      readonly: true
+    # 確定ボタンはexamplesの完全な定義を参照
+```
+
+画面の `inputs` は受信契約（id・type・任意のrequired）。typeはtext・number・booleanに対応するが、表示項目は現在text・numberのみ。required省略時は任意で、trueなら未指定・nullを拒否する。空文字を拒否したい場合はValidationも定義する。受信値の型が違う場合や、未定義の受信引数は定義・入力エラーにする。
+
+`source.input` がある項目はtypeを省略できる。typeを併記した場合は継承元との一致が必要。readonlyは任意の真偽値で、trueの項目は対話操作・テスト入力による変更を拒否する。
+
+transitionはアクションの最後に置く。入力チェックで止まった場合、遷移しない。routesのあるprojectではtransitionのtargetに画面IDではなくパスを指定する。projectに登録された遷移先の存在、引数名、型、必須引数を検査する。`--design` / `--test` の直接指定では他画面を読み込まないため、画面をまたぐ検査は必ず `--project` で実行する。
+
+### 新しいテスト期待値
+
+| キー | 内容 |
+| --- | --- |
+| `screen_inputs`（ケース直下） | 画面に渡す受信値。省略時は空マッピング |
+| `expect.transition` | `{target: /confirm, inputs: {name: 山田, age: 30}}`。遷移しない場合はnull |
+| `expect.field_values` | 受信値とinputから確定した項目値の全体 |
+| `expect.process_calls` | `[{action: create_user, inputs: {name: 山田, age: 30}}]` のような処理名・引数の一覧 |
+
+テスト結果の `processes` は呼び出したアクション名の配列として維持する（画面直下の定義とは別）。processは引数を渡して呼び出し先のステップも模擬実行する。DB登録は行わない。Validationのtargetはアクション引数名。`{label}` はfield参照なら元項目のlabelを使い、それ以外なら引数名を使う。
+
+```yaml
+design_tests:
+  - name: 確認画面で受信値を登録処理に渡す
+    action: confirm_entry
+    screen_inputs:
+      name: 山田太郎
+      age: 30
+    input: {}
+    expect:
+      field_values: {name: 山田太郎, age: 30}
+      process_calls:
+        - action: create_user
+          inputs: {name: 山田太郎, age: 30}
+      messages: [登録しました。]
+      transition:
+        target: /
+        inputs: {}
+```
+
+完全な2画面のサンプルは [examples/project.yaml](examples/project.yaml)。次のコマンドで試せる。
+
+```sh
+seda verify --project examples/project.yaml
+seda preview --project examples/project.yaml
+seda interact --project examples/project.yaml
+```
+
+`design-yaml/` はinit用の独立した1画面ひな形。`examples/` を編集しても新規プロジェクトのひな形には影響しない。
+
 ## 現在の対応仕様
 
 - `fields` は `text`・`number`・`button` に対応。項目型から検証ルールは自動生成しない。
@@ -459,9 +774,9 @@ design_tests:
 - `empty` は未指定・`null`・空文字・空白のみの文字列でtrueを返す。必須チェックは `operator: empty` と `expected: false` で定義する。
 - `number` は有限の数値でtrueを返す。数値チェックは `operator: number` と `expected: true` で定義する。数値文字列・真偽値は数値へ変換しない。値が空でも数値チェックを省略しないため、年齢未指定時は `{validation: required, target: age}` と `{validation: is_number, target: age}` の両方が返る。
 - `on_error.action: show_message` は `{label}` を置換した検証メッセージを記録する。`on_error` を省略しても検証エラーと中断は発生するが、検証メッセージは記録しない。
-- `process` は処理名を記録するシミュレーション。`create_user` などの処理本体やDBアクセスは実行せず、処理内部の成功・失敗も検証しない。
+- `process` は同画面のアクションを呼び出すシミュレーション。YAMLで定義した検証・メッセージ・デバッグ・遷移を実行し、外部プログラムやDBアクセスは実行しない。
 - `message` はメッセージを記録する。各ケースは独立し、保存データを共有しない。
-- ID重複、参照切れ、未対応のキー・演算子・ステップ型、空のテストや期待値はエラーにする。
+- ID重複、参照切れ、未対応のキー・演算子・ステップ型、空のテストや期待値はエラーにする。遷移先とその引数の型・必須項目はproject単位で検査する。
 
 ### テストYAMLの期待値
 
@@ -477,7 +792,7 @@ design_tests:
       validation_error: []
       processes: [create_user]
       messages: [登録しました。]
-      executed_steps: [validate, register, completed]
+      executed_steps: [validate, register, create_user.register, completed]
 ```
 
 `expect` で指定した項目だけを比較する。配列は順序を含む完全一致で比較する。
@@ -488,7 +803,8 @@ design_tests:
 | `validation_error` | `{validation: 検証ID, target: 項目ID}` のオブジェクト一覧 |
 | `processes` | 到達したprocessステップの処理名一覧 |
 | `messages` | 検証メッセージとmessageステップのメッセージ一覧 |
-| `executed_steps` | 到達したステップID一覧。エラーで止まったステップも含む |
+| `executed_steps` | 実行順のステップID一覧。呼び出し先は `アクションID.ステップID`。エラーで止まったステップも含む |
+| `debug_logs` | debugステップの文言の配列。`expect.debug_logs` で検証できる |
 
 `validation_error` のみ指定した場合、空配列なら `success: true`、エラーがあれば `success: false` も暗黙に検証する。成功とエラーの期待値が矛盾する場合は定義エラーとなる。
 
@@ -549,3 +865,29 @@ expect:
 
 この実験で確認するのは、定義した仕様とテスト範囲における実装可能性・検証可能性であり、テストで表現していない仕様まで正しいことを保証するものではない。
 # seda
+
+遷移ステップ（`type: transition`）の `inputs` は省略可能で、省略時は空の対応表として扱う。遷移先に必須の受信引数がある場合は、省略すると引数不足のエラーになる。`inputs: null` や配列は使用できない。
+
+### メニューバー
+
+viewの `layout.menu_bar.fields` にボタンIDを並べると、タイトルの下に横並びのメニューバーを表示する。ラベル・アクション・引数はspecの既存のbutton定義を使う。同じ項目をmenu_barとsectionsの両方には配置できない。本文のsectionsは1件以上必要。
+
+```yaml
+screen01:
+  title: ユーザ登録
+  layout:
+    type: form
+    direction: vertical
+    menu_bar:
+      fields: [help_button, add_button]
+    sections:
+      - id: user_info
+        title: ユーザ情報
+        fields: [name, age]
+```
+
+Tab・Shift+Tab・矢印キーで選び、Enterでアクションを実行する。番号入力モードではメニューから順に番号が付く。階層メニューやドロップダウンには未対応。
+
+サンプルを試すには `seda interact --project examples/menu-bar/project.yaml`、表示だけ確認するには `seda preview --project examples/menu-bar/project.yaml` を実行する。
+
+ルート付きプロジェクトのpreview・interactでは、ワイヤーフレーム上部にブラウザ風の `URL [ / ]` 欄を表示する。遷移・リダイレクト・リセット後のパスが反映される。URL欄は表示専用で、開始パスは `--path` で指定する。

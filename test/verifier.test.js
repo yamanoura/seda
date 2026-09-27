@@ -128,7 +128,7 @@ test('CLIの終了コード0/1/2とJSON出力', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'yaml-verifier-'));
   const cli = (...args) => spawnSync(process.execPath, ['src/cli.js', ...args], { encoding: 'utf8' });
   try {
-    const good = cli('--json');
+    const good = cli('--project', 'design-yaml/project.yaml', '--json');
     assert.equal(good.status, 0, good.stderr);
     assert.equal(JSON.parse(good.stdout).passed, 5);
     const mismatch = join(dir, 'mismatch.yaml');

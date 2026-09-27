@@ -21,7 +21,7 @@ test('日本語・長いラベルでも枠が揃い、項目を省略しない',
 test('2列、列結合、横並びボタン、mobileの1列表示', () => {
   const d = structuredClone(spec), v = structuredClone(view);
   d.screen01.fields.push({ id: 'address', type: 'text', label: '住所' }, { id: 'phone', type: 'text', label: '電話' },
-    { id: 'cancel', type: 'button', label: '取消', trigger: 'click', action: 'add_entry' });
+    { id: 'cancel', type: 'button', label: '取消', trigger: 'click', action: 'add_entry', inputs: structuredClone(d.screen01.fields[2].inputs) });
   v.screen01.layout.sections = [
     { id: 'left', fields: ['name', 'address'] },
     { id: 'right', fields: ['age', 'phone'] },

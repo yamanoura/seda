@@ -1,0 +1,36 @@
+app:
+  description: 全画面共通の処理とレイアウト
+  inputs:
+    - id: path
+      type: text
+      required: true
+    - id: screen
+      type: text
+      required: true
+  before_each:
+    action: prepare
+    inputs:
+      path:
+        input: path
+      screen:
+        input: screen
+  fields: []
+  actions:
+    - id: prepare
+      inputs:
+        - id: path
+          type: text
+        - id: screen
+          type: text
+      steps:
+        - id: prepare_log
+          type: debug
+          message: 共通の表示前処理を実行しました。
+  view:
+    title: ユーザ管理サービス
+    layout:
+      type: form
+      direction: vertical
+      sections:
+        - id: content
+          type: outlet
