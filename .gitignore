@@ -3,3 +3,7 @@ node_modules/
 # SQLite sample data and journal files
 /examples/sqlite/data.sqlite
 /examples/sqlite/data.sqlite-*
+
+# Generated design documents
+/output/pdf/
+/design.pdf

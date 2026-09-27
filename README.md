@@ -23,6 +23,7 @@ YAML形式の設計書を元にAIがプログラムを実装できること、�
 | 機能 | 内容 |
 | --- | --- |
 | `verify` | 定義・参照・型を検査し、画面とルートのYAMLテストを実行 |
+| `pdf` | 設計YAMLを日本語の説明に変換し、共有用PDFを生成 |
 | `preview` | 共通レイアウト、メニュー、URL欄を含むテキストワイヤーフレームを表示 |
 | `interact` | キーボードで入力・ボタン操作し、画面遷移と引数の受け渡しを確認 |
 | アクション | 入力検証、条件分岐、処理呼び出し、返り値、メッセージ・デバッグ出力 |
@@ -139,6 +140,37 @@ seda verify
 ```
 
 作成後はspecに項目・処理を定義し、viewに配置と見た目の役割、testに入力と期待値を記述する。画面を追加するときはファイルと画面IDを用意し、projectの `main` に参照、`routes` にURLパスを追加する。対応するキー・型・演算子は下記の対応仕様の範囲内とする。
+
+### 読みやすい設計書をPDFで生成する
+
+`seda pdf` は設計YAMLを日本語の説明に変換し、顧客やYAMLの記法に慣れていない人が確認できるPDFを作成する。AIや外部サービスへの送信は行わず、定義から一定のルールで生成する。
+
+```sh
+# 現在のディレクトリのproject.yamlからdesign.pdfを生成
+seda pdf
+
+# 出力先・表題を指定
+seda pdf --project examples/project.yaml --output output/pdf/design.pdf --title "ユーザ管理 設計書"
+
+# 1画面だけ出力（共通処理も掲載）
+seda pdf --project examples/project.yaml --screen screen01 -o screen01.pdf
+
+# 単独のspecからも作成可能。テストは任意
+seda pdf --design examples/features/screen01/screen01.spec.yaml --test examples/features/screen01/screen01.test.yaml -o screen01.pdf
+```
+
+PDFには画面一覧、共通の動作、画面項目と型・編集可否、受信値、ボタン操作時の処理、条件分岐、入力チェックとエラー文言、遷移と値の受け渡し、DB操作、テストの入力と期待値を掲載する。説明が未定義の処理やDBの名称には元のIDを使用する。未翻訳の詳細キーも省略せず掲載する。画面の見た目・ワイヤーフレームやDBテーブル定義一覧は含まない。
+
+生成時に設計定義を検証するが、操作・DB更新・テストは実行しない。確認例は**設計上の期待値**であり、実行済みや検証合格を意味しない。動作検証には別途 `seda verify` を使う。projectに指定したテストファイルは読み込むため、存在しないファイルはエラーになる。
+
+日本語フォントをPDFに埋め込む。macOSのヒラギノ角ゴシック、Linuxの標準的な配置のNoto Sans CJK、WindowsのMeiryoを順に探す。他の場所にある日本語フォントは次のように指定する（TTF/OTF/TTC。TTCは最初の書体）。フォントが見つからなければ案内を表示して終了する。
+
+```sh
+seda pdf --font /path/to/NotoSansJP-Regular.ttf
+# 環境変数 SEDA_PDF_FONT でも指定できる
+```
+
+`--output`（`-o`）は既定で `design.pdf`。親ディレクトリは自動作成し、既存の出力PDFは生成成功時に置き換える。`--json` は出力先とページ数をJSONで返す。`--view`・`--device`・`--width`・`--path` は指定できない。PDF生成にはPythonやブラウザは不要。
 
 ### テキストで画面イメージを確認する
 

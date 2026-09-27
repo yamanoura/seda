@@ -3,6 +3,7 @@ import { parseArgs } from 'node:util';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { DefinitionError, readYaml, runTests } from './verifier.js';
+import { buildReport, writeReportPdf } from './pdf.js';
 import { interact } from './interact.js';
 import { findProject, runProject } from './project.js';
 import { previewProject, renderPreview, loadPreviewScreens } from './preview.js';
@@ -14,6 +15,8 @@ const help = `使い方:
   seda preview --design <spec.yaml> --view <view.yaml> [--json]
   seda interact [--project <project.yaml>] [--path /] [--db-file <保存先.sqlite>]
   seda preview --interactive [--path /]
+  seda pdf [--project <project.yaml>] [--screen <ID>] [--output design.pdf] [--font <日本語フォント>]
+  seda pdf --design <spec.yaml> [--test <test.yaml>] [--output design.pdf]
   seda --version
 
 routes定義がある場合、preview・interactは / から共通appを経由して起動します。--pathで開始パスを指定できます。
@@ -28,6 +31,7 @@ try {
     project: { type: 'string', short: 'p' },
     design: { type: 'string' }, test: { type: 'string' }, screen: { type: 'string' },
     'db-file': { type: 'string' }, path: { type: 'string' }, view: { type: 'string' }, device: { type: 'string' }, width: { type: 'string' },
+    output: { type: 'string', short: 'o' }, font: { type: 'string' }, title: { type: 'string' },
     interactive: { type: 'boolean' },
     json: { type: 'boolean', default: false },
     help: { type: 'boolean', short: 'h' }, version: { type: 'boolean', short: 'v' },
@@ -35,12 +39,19 @@ try {
   json = values.json;
   if (values.path !== undefined && (values.screen !== undefined || values.design !== undefined)) throw new DefinitionError('--pathは--screen・--designと併用できません');
   const command = positionals[0] ?? 'verify';
+  if (command !== 'pdf' && ['output','font','title'].some(k => values[k] !== undefined)) throw new DefinitionError('--output / --font / --title はpdf専用です');
   if (values['db-file'] !== undefined && (!(command==='interact' || command==='preview' && values.interactive) || values.design!==undefined || values.view!==undefined)) throw new DefinitionError('--db-fileはprojectを使う対話モード専用です。verify・previewはメモリDBを使います');
   if (values.interactive && command !== 'preview') throw new DefinitionError('--interactiveはpreview専用です');
   if (values.help) console.log(help);
   else if (values.version) {
     const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
     console.log(pkg.version);
+  } else if (command === 'pdf') {
+    if (positionals.length > 1 || ['path','view','device','width','interactive'].some(k => values[k] !== undefined)) throw new DefinitionError('pdfには--path / --view / --device / --width / --interactiveや追加の位置引数は指定できません');
+    if (values.design && values.project || values.test && !values.design) throw new DefinitionError('pdfの--designと--projectは併用できません。--testには--designが必要です');
+    const blocks = await buildReport({ project: values.design ? undefined : values.project ?? await findProject(), design: values.design, test: values.test, screen: values.screen, title: values.title });
+    const result = await writeReportPdf(blocks, {output: values.output, font: values.font});
+    console.log(json ? JSON.stringify(result) : `PDFを生成しました: ${result.output}（${result.pages}ページ）`);
   } else if (command === 'interact' || (command === 'preview' && values.interactive)) {
     if (positionals.length > 1 || values.json || values.test !== undefined) throw new DefinitionError('対話モードに--json・--test・追加の位置引数は指定できません');
     const direct = values.design !== undefined || values.view !== undefined;
