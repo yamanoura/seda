@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readYaml, runTests } from '../src/verifier.js';
 import { createSession } from '../src/interact.js';
-const spec = await readYaml('design-yaml/features/screen01/screen01.spec.yaml');
-const view = await readYaml('design-yaml/features/screen01/screen01.view.yaml');
+const spec = await readYaml('test/fixtures/registration/features/screen01/screen01.spec.yaml');
+const view = await readYaml('test/fixtures/registration/features/screen01/screen01.view.yaml');
 
 test('入力、エラー、中断、修正、ボタン実行、リセットとセッション分離', () => {
   const session = createSession(spec, view);
@@ -39,7 +39,7 @@ test('対話入力だけ数値変換し、YAMLテストの文字列は変換し�
 
 test('CLIで連続操作、EOF、preview別名、無効オプション', () => {
   const cli = (args, input) => spawnSync(process.execPath, ['bin/yaml-design.cjs', ...args], { encoding: 'utf8', input, timeout: 5000 });
-  const result = cli(['interact', '--project', 'design-yaml/project.yaml'], '99\n3\n1\n山田太郎\n2\nABC\n3\n2\n30\n3\nr\nq\n');
+  const result = cli(['interact', '--project', 'test/fixtures/registration/project.yaml'], '99\n3\n1\n山田太郎\n2\nABC\n3\n2\n30\n3\nr\nq\n');
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /存在する項目番号/);
   assert.match(result.stdout, /入力エラー/);
@@ -47,8 +47,8 @@ test('CLIで連続操作、EOF、preview別名、無効オプション', () => {
   assert.match(result.stdout, /登録しました/);
   assert.match(result.stdout, /リセットしました/);
   assert.match(result.stdout, /終了しました/);
-  assert.equal(cli(['preview', '--interactive', '--project', 'design-yaml/project.yaml'], 'q\n').status, 0);
-  assert.equal(cli(['interact', '--project', 'design-yaml/project.yaml'], '1\n').status, 0);
+  assert.equal(cli(['preview', '--interactive', '--project', 'test/fixtures/registration/project.yaml'], 'q\n').status, 0);
+  assert.equal(cli(['interact', '--project', 'test/fixtures/registration/project.yaml'], '1\n').status, 0);
   assert.equal(cli(['interact', '--json'], '').status, 2);
   assert.equal(cli(['verify', '--interactive'], '').status, 2);
 });

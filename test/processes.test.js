@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { stringify, parse } from 'yaml';
 import { readYaml, compileDesign } from '../src/verifier.js';
-const source = await readYaml('design-yaml/features/screen01/screen01.spec.yaml');
+const source = await readYaml('test/fixtures/registration/features/screen01/screen01.spec.yaml');
 
 test('未定義の処理は入力チェックで停止する経路でもコンパイル時に拒否する', () => {
   const spec = structuredClone(source);

@@ -4,8 +4,8 @@ import { PassThrough } from 'node:stream';
 import { readYaml } from '../src/verifier.js';
 import { createSession } from '../src/interact.js';
 import { keyboardController, keyboardInteract } from '../src/keyboard.js';
-const spec = await readYaml('design-yaml/features/screen01/screen01.spec.yaml');
-const view = await readYaml('design-yaml/features/screen01/screen01.view.yaml');
+const spec = await readYaml('test/fixtures/registration/features/screen01/screen01.spec.yaml');
+const view = await readYaml('test/fixtures/registration/features/screen01/screen01.view.yaml');
 
 test('フォーカス循環、日本語編集、取消、修正、ボタン押下', () => {
   const session = createSession(spec, view), ui = keyboardController(session);

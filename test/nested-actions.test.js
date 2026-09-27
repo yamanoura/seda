@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readYaml, compileDesign, simulate, runTests } from '../src/verifier.js';
 import { formatFeedback } from '../src/feedback.js';
-const source = await readYaml('design-yaml/features/screen01/screen01.spec.yaml');
+const source = await readYaml('test/fixtures/registration/features/screen01/screen01.spec.yaml');
 const call = (action, inputs = {}) => ({id:'call',type:'process',action,inputs});
 
 test('呼び出し先を実行し、debugは画面メッセージに混在させない', () => {

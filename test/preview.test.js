@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os';
 import stringWidth from 'string-width';
 import { readYaml } from '../src/verifier.js';
 import { renderPreview } from '../src/preview.js';
-const spec = await readYaml('design-yaml/features/screen01/screen01.spec.yaml');
-const view = await readYaml('design-yaml/features/screen01/screen01.view.yaml');
+const spec = await readYaml('test/fixtures/registration/features/screen01/screen01.spec.yaml');
+const view = await readYaml('test/fixtures/registration/features/screen01/screen01.view.yaml');
 
 test('日本語・長いラベルでも枠が揃い、項目を省略しない', () => {
   const d = structuredClone(spec);
@@ -56,7 +56,7 @@ test('参照切れ、未配置、重複、範囲外、制御文字は拒否す�
 
 test('CLIを外部ディレクトリから実行し、JSONと引数エラーを確認する', () => {
   const cli = (...args) => spawnSync(process.execPath, [resolve('src/cli.js'), ...args], { cwd: tmpdir(), encoding: 'utf8' });
-  const project = resolve('design-yaml/project.yaml');
+  const project = resolve('test/fixtures/registration/project.yaml');
   const result = cli('preview', '-p', project, '--json');
   assert.equal(result.status, 0, result.stderr);
   assert.match(JSON.parse(result.stdout).previews[0].text, /ユーザ登録/);

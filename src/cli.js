@@ -1,15 +1,13 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
-import { cp, mkdir, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { DefinitionError, readYaml, runTests } from './verifier.js';
 import { interact } from './interact.js';
 import { findProject, runProject } from './project.js';
 import { previewProject, renderPreview, loadPreviewScreens } from './preview.js';
 
 const help = `使い方:
-  seda init <新規ディレクトリ>
   seda verify [--project <project.yaml>] [--screen <ID>] [--json]
   seda verify --design <spec.yaml> --test <test.yaml> [--screen <ID>] [--json]
   seda preview [--project <project.yaml>] [--screen <ID>] [--device desktop|mobile] [--width 60]
@@ -20,7 +18,6 @@ const help = `使い方:
 
 routes定義がある場合、preview・interactは / から共通appを経由して起動します。--pathで開始パスを指定できます。
 コマンド省略時はverify。現在のディレクトリのproject.yamlのみを読み込みます。なければエラーになります。
-initはユーザ登録の設計・表示・テスト・Design Systemのサンプルを新規ディレクトリに作成します。
 --design/--test指定時は両方必須で、--projectとは併用できません。
 終了コード: 0=成功、1=期待値不一致、2=定義・読み込み・引数エラー。
 database_fileがあればSQLiteでDB操作を実行します。verifyはケースごとに独立したメモリDB、interactは起動中共有（--db-fileで永続化）。
@@ -44,14 +41,6 @@ try {
   else if (values.version) {
     const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
     console.log(pkg.version);
-  } else if (command === 'init') {
-    if (positionals.length !== 2 || Object.keys(values).some(k => k !== 'json')) throw new DefinitionError('initは新規ディレクトリを1つ指定してください');
-    const target = resolve(positionals[1]);
-    // mkdirを排他的に実行し、既存のディレクトリ・ファイルは上書きしない。
-    await mkdir(target);
-    await cp(fileURLToPath(new URL('../design-yaml/', import.meta.url)), target, { recursive: true, force: false, errorOnExist: true });
-    if (json) console.log(JSON.stringify({ created: target }));
-    else console.log(`作成しました: ${target}\n編集後、このディレクトリで seda verify を実行してください。`);
   } else if (command === 'interact' || (command === 'preview' && values.interactive)) {
     if (positionals.length > 1 || values.json || values.test !== undefined) throw new DefinitionError('対話モードに--json・--test・追加の位置引数は指定できません');
     const direct = values.design !== undefined || values.view !== undefined;

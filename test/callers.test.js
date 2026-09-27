@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readYaml, compileDesign, simulate, runTests } from '../src/verifier.js';
 import { createSession } from '../src/interact.js';
-const source = await readYaml('design-yaml/features/screen01/screen01.spec.yaml');
-const viewSource = await readYaml('design-yaml/features/screen01/screen01.view.yaml');
+const source = await readYaml('test/fixtures/registration/features/screen01/screen01.spec.yaml');
+const viewSource = await readYaml('test/fixtures/registration/features/screen01/screen01.view.yaml');
 function fixture() {
   const spec = structuredClone(source), view = structuredClone(viewSource);
   const button = structuredClone(spec.screen01.fields[2]);

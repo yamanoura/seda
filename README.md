@@ -22,7 +22,6 @@ YAML形式の設計書を元にAIがプログラムを実装できること、�
 
 | 機能 | 内容 |
 | --- | --- |
-| `init` | 共通appと1画面のユーザ登録ひな形を作成 |
 | `verify` | 定義・参照・型を検査し、画面とルートのYAMLテストを実行 |
 | `preview` | 共通レイアウト、メニュー、URL欄を含むテキストワイヤーフレームを表示 |
 | `interact` | キーボードで入力・ボタン操作し、画面遷移と引数の受け渡しを確認 |
@@ -35,25 +34,29 @@ YAML形式の設計書を元にAIがプログラムを実装できること、�
 
 | 場所 | 用途 |
 | --- | --- |
-| [design-yaml/](design-yaml/) | `init`が複製する1画面のひな形。入力検証・処理中断・正常系など5ケース。DBへの保存は行わない |
 | [examples/](examples/) | 入力・確認の2画面、共通ホームメニュー、ルートテストのサンプル |
 | [examples/sqlite/](examples/sqlite/) | 2画面の登録フローにSQLiteの参照・登録・更新とアクションの返り値を追加したサンプル |
 | [src/](src/) / [bin/](bin/) | CLI、設計検証・実行、テキストUI、SQLite処理と起動用ラッパー |
-| [test/](test/) | CLI・検証・画面操作・DBなどの自動テスト |
+| [test/](test/) | CLI・検証・画面操作・DBなどの自動テスト。`fixtures/registration/`はテスト専用データ |
 | [docs/design-principles.md](docs/design-principles.md) | 設計方針と将来構想 |
 
-新規作成される設計の構成は次のとおり。
+2画面サンプルの構成は次のとおり。
 
 ```text
-design-yaml/
+examples/
 ├── project.yaml
 ├── app.yaml                # 全画面共通の処理・レイアウト
+├── routes.test.yaml
 ├── design-system.yaml
 └── features/
-    └── screen01/
-        ├── screen01.spec.yaml
-        ├── screen01.view.yaml
-        └── screen01.test.yaml
+    ├── screen01/           # 入力画面
+    │   ├── screen01.spec.yaml
+    │   ├── screen01.view.yaml
+    │   └── screen01.test.yaml
+    └── screen02/           # 確認画面
+        ├── screen02.spec.yaml
+        ├── screen02.view.yaml
+        └── screen02.test.yaml
 ```
 
 `project.yaml` の `design_system_file`・`app_file`・`route_test_file`・`database_file`・`spec_file`・`view_file`・`test_file` は、このファイルのあるディレクトリを基準とする相対パス。画面IDは一覧・spec・viewで一致させる。
@@ -118,19 +121,22 @@ seda verify
 seda interact
 ```
 
-`init` で作成済みの設計YAMLは独立したコピーであり、再インストールしても上書き・自動更新されない。YAMLの記載ルールを変更した場合は、各設計プロジェクトのYAMLを新しいルールに合わせる。
+作成済みの設計YAMLは独立したファイルであり、再インストールしても上書き・自動更新されない。YAMLの記載ルールを変更した場合は、各設計プロジェクトのYAMLを新しいルールに合わせる。
 
 開発時は、seda本体のディレクトリで `npm link` を実行して登録する方法も使える。リンク先のコード修正は次回起動時に反映される。リポジトリを移動・削除した場合は再登録が必要。アンインストールは `npm uninstall -g yaml-design-verifier`。
 
 ### 新しい設計書を作る
 
+`init`コマンドは廃止した。既存の[2画面サンプル](examples/project.yaml)を参考に、project・app・spec・view・testを用意する。サンプルをコピーして始める場合は、必要なファイルだけを新規ディレクトリへコピーする。
+
 ```sh
-seda init my-design
+# sedaリポジトリ直下で実行。my-designは未作成のディレクトリを指定する
+mkdir my-design
+cp examples/project.yaml examples/app.yaml examples/routes.test.yaml examples/design-system.yaml my-design/
+cp -R examples/features my-design/
 cd my-design
 seda verify
 ```
-
-`init` は現在のユーザ登録サンプルを複製し、project・app・spec・view・test・Design Systemを作成する。作成先の親ディレクトリは存在している必要がある。既存のファイルやディレクトリは上書きせず、エラーにする。
 
 作成後はspecに項目・処理を定義し、viewに配置と見た目の役割、testに入力と期待値を記述する。画面を追加するときはファイルと画面IDを用意し、projectの `main` に参照、`routes` にURLパスを追加する。対応するキー・型・演算子は下記の対応仕様の範囲内とする。
 
@@ -276,7 +282,7 @@ seda --help
 seda --version
 ```
 
-コマンド省略時は `verify`。project未指定時はカレントディレクトリの `project.yaml` のみを読み込む。なければ「現在のディレクトリにproject.yamlがありません」と表示し、終了コード2で終了する。`design-yaml/` や親ディレクトリは検索しない。verify・preview・interactで共通の規則。project内のファイル参照はprojectの所在ディレクトリ基準で解決する。CLIに渡すパスはカレントディレクトリ基準。
+コマンド省略時は `verify`。project未指定時はカレントディレクトリの `project.yaml` のみを読み込む。なければ「現在のディレクトリにproject.yamlがありません」と表示し、終了コード2で終了する。サブディレクトリや親ディレクトリは検索しない。verify・preview・interactで共通の規則。project内のファイル参照はprojectの所在ディレクトリ基準で解決する。CLIに渡すパスはカレントディレクトリ基準。
 
 `--design` と `--test` は `--project` と併用できない。projectモードは現在 `type: screen` のみ対応し、画面ID重複と参照ファイルの読み込みを確認する。遷移先の整合性確認のため全画面のspecを読み込む。routesがある場合は共通appと全画面のviewも読み込み、共通レイアウトとの組み合わせを検証する。`--screen` 指定時は選択画面の設計テストだけを実行するが、共通処理・ルート・全画面の静的な整合性検証は省略しない。`--screen` 指定時は `route_test_file` のテストケースを実行しない。Design Systemは省略可能。旧mainだけの形式ではverify時のviewも省略可能。
 
@@ -296,7 +302,6 @@ FAIL [screen01] 正常入力
 リポジトリ直下でサンプルを試す場合は、`--project` を明示する。グローバルインストール前でも次のコマンドを使える。
 
 ```sh
-npm run verify -- --project design-yaml/project.yaml
 npm run verify -- --project examples/project.yaml
 npm run verify -- --project examples/sqlite/project.yaml
 node bin/yaml-design.cjs preview --project examples/project.yaml
@@ -357,7 +362,7 @@ route_test_file: routes.test.yaml
 | `route_test_file` | 任意。ルート解決と共通処理の期待値を定義するテスト |
 | `design_system_file` | 任意。共通スタイル定義 |
 
-`routes`・`app_file`のない既存projectは互換動作し、main先頭の画面から起動する。新しい`init`はURLと共通appを持つ形式で作成する。固定パスの完全一致のみ対応し、クエリ・動的パラメータ・末尾のスラッシュ（`/`以外）は未対応。
+`routes`・`app_file`のない既存projectは互換動作し、main先頭の画面から起動する。固定パスの完全一致のみ対応し、クエリ・動的パラメータ・末尾のスラッシュ（`/`以外）は未対応。
 
 ### app.yaml：共通処理と共通レイアウト
 
@@ -623,7 +628,7 @@ design_system:
       min_height: 44
 ```
 
-これはスタイル部分の最小例。全体のサンプルは [design-system.yaml](design-yaml/design-system.yaml) を参照。現在のverifyはこのファイルのYAML読み込みのみを検証し、色・サイズ・variantの汎用的な参照検証は行わない。
+これはスタイル部分の最小例。全体のサンプルは [design-system.yaml](examples/design-system.yaml) を参照。現在のverifyはこのファイルのYAML読み込みのみを検証し、色・サイズ・variantの汎用的な参照検証は行わない。
 
 ### test.yaml：入力と期待値
 
@@ -815,7 +820,7 @@ seda preview --project examples/project.yaml
 seda interact --project examples/project.yaml
 ```
 
-`design-yaml/` はinit用の独立した1画面ひな形。`examples/` を編集しても新規プロジェクトのひな形には影響しない。
+`examples/` は手動でコピーして利用するサンプル。コピー後の設計は独立しており、sedaの更新で自動変更されない。
 
 ## 現在の対応仕様
 

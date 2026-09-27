@@ -6,22 +6,22 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { readYaml, runTests, compileDesign, simulate } from '../src/verifier.js';
 
-const source = await readYaml('design-yaml/features/screen01/screen01.spec.yaml');
-const designTests = await readYaml('design-yaml/features/screen01/screen01.test.yaml');
+const source = await readYaml('test/fixtures/registration/features/screen01/screen01.spec.yaml');
+const designTests = await readYaml('test/fixtures/registration/features/screen01/screen01.test.yaml');
 const design = compileDesign(source);
 
 test('projectの参照ファイルとviewの項目参照が現在の構成に一致する', async () => {
-  const project = await readYaml('design-yaml/project.yaml');
-  const { design_system: ds } = await readYaml(join('design-yaml', project.design_system_file));
+  const project = await readYaml('test/fixtures/registration/project.yaml');
+  const { design_system: ds } = await readYaml(join('test/fixtures/registration', project.design_system_file));
   for (const variant of Object.values(ds.variants)) {
     assert.ok(Object.hasOwn(ds.colors, variant.background));
     assert.ok(Object.hasOwn(ds.colors, variant.foreground));
   }
   assert.ok(project.main.length > 0);
   for (const feature of project.main) {
-    const spec = await readYaml(join('design-yaml', feature.spec_file));
-    const view = await readYaml(join('design-yaml', feature.view_file));
-    const cases = await readYaml(join('design-yaml', feature.test_file));
+    const spec = await readYaml(join('test/fixtures/registration', feature.spec_file));
+    const view = await readYaml(join('test/fixtures/registration', feature.view_file));
+    const cases = await readYaml(join('test/fixtures/registration', feature.test_file));
     const compiled = compileDesign(spec, feature.id);
     assert.ok(view[feature.id], 'viewの画面IDが一致すること');
     const screen = view[feature.id];
@@ -74,7 +74,7 @@ test('登録を入力検証より先に移動すると副作用テストが失�
   const mutated = structuredClone(source);
   const steps = mutated.screen01.actions[0].steps;
   [steps[0], steps[1]] = [steps[1], steps[0]];
-  const cases = await readYaml('design-yaml/features/screen01/screen01.test.yaml');
+  const cases = await readYaml('test/fixtures/registration/features/screen01/screen01.test.yaml');
   const result = runTests(mutated, cases)[1];
   assert.equal(result.passed, false);
   assert.ok(result.differences.some(d => d.key === 'processes'));
@@ -128,20 +128,20 @@ test('CLIの終了コード0/1/2とJSON出力', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'yaml-verifier-'));
   const cli = (...args) => spawnSync(process.execPath, ['src/cli.js', ...args], { encoding: 'utf8' });
   try {
-    const good = cli('--project', 'design-yaml/project.yaml', '--json');
+    const good = cli('--project', 'test/fixtures/registration/project.yaml', '--json');
     assert.equal(good.status, 0, good.stderr);
     assert.equal(JSON.parse(good.stdout).passed, 5);
     const mismatch = join(dir, 'mismatch.yaml');
     await writeFile(mismatch, 'design_tests:\n  - action: add_entry\n    input: {name: 山田, age: 20}\n    expect: {success: false}\n');
-    const bad = cli('--design', 'design-yaml/features/screen01/screen01.spec.yaml', '--test', mismatch);
+    const bad = cli('--design', 'test/fixtures/registration/features/screen01/screen01.spec.yaml', '--test', mismatch);
     assert.equal(bad.status, 1);
     assert.match(bad.stdout, /expected: false/);
     assert.match(bad.stdout, /actual:   true/);
     const invalid = join(dir, 'invalid.yaml');
     await writeFile(invalid, 'design_tests: []\ndesign_tests: []\n');
-    assert.equal(cli('--design', 'design-yaml/features/screen01/screen01.spec.yaml', '--test', invalid).status, 2);
+    assert.equal(cli('--design', 'test/fixtures/registration/features/screen01/screen01.spec.yaml', '--test', invalid).status, 2);
     await writeFile(invalid, 'design_tests: [\n');
-    assert.equal(cli('--design', 'design-yaml/features/screen01/screen01.spec.yaml', '--test', invalid).status, 2);
+    assert.equal(cli('--design', 'test/fixtures/registration/features/screen01/screen01.spec.yaml', '--test', invalid).status, 2);
     assert.equal(cli('--test', join(dir, 'missing.yaml')).status, 2);
     assert.equal(cli('--unknown').status, 2);
   } finally {

@@ -21,7 +21,6 @@
   },
   "files": [
     "src/",
-    "design-yaml/",
     "docs/",
     "README.md",
     "bin/"
