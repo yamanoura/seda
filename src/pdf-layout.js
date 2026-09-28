@@ -135,16 +135,28 @@ export function renderReport(doc,blocks) {
   }
 
   function wireframe(block) {
+    const inset=12, left=48+inset, width=doc.page.width-96-inset*2;
+    let frameTop;
+    const closeFrame=()=>{
+      doc.save().lineWidth(1).strokeColor(C.muted)
+        .roundedRect(left-inset,frameTop,width+inset*2,doc.y-frameTop+10,6).stroke().restore();
+    };
     const fields=new Map(block.fields.map(f=>[f.id,f]));
     const layout=block.view.layout, columns=block.view.responsive?.desktop?.columns ?? layout.columns ?? 1;
     let menu=(layout.menu_bar?.fields ?? []).map(id=>fields.get(id)?.label).join('　／　');
     let continued=false;
     const start=()=>{
-      room(125);const y=doc.y;
+      room(145);frameTop=doc.y;const y=frameTop+inset;
       box(left,y,width,38,C.pale);
       lineText(block.text+(continued?'（続き）':''),left+14,y+10,12,C.accent);
       doc.y=y+47;
-      if(menu) {paragraph('メニュー: '+menu,{size:9,color:C.muted,gap:5});}
+      if(menu) {
+        for(const line of lines('メニュー: '+menu,width,9)) {
+          if(doc.y+29>bottom()) {closeFrame();doc.addPage();frameTop=doc.y;doc.y+=inset;}
+          const y=doc.y;lineText(line,left,y,9,C.muted);doc.y=y+15;
+        }
+        doc.y+=5;
+      }
     };
     start();
     const gap=12;
@@ -169,7 +181,7 @@ export function renderReport(doc,blocks) {
       const maxRows=Math.max(...groups.map(g=>g.rows.length));
       for(let r=0;r<maxRows;r++) {
         const h=Math.max(...groups.map(g=>g.rows[r]?.height ?? 0))+(r===0?titleHeight:0);
-        if(doc.y+h>bottom()) {doc.addPage();continued=true;start();}
+        if(doc.y+h+16>bottom()) {closeFrame();doc.addPage();continued=true;start();}
         const y=doc.y;let x=left;
         for(const g of groups) {
           if(r===0 && g.s.title) lines(g.s.title,g.w,10).forEach((l,i)=>lineText(l,x,y+i*14,10,C.accent));
@@ -205,7 +217,7 @@ export function renderReport(doc,blocks) {
       packed.push({s,span});used+=span;
       if(used===columns) drawPacked();
     }
-    drawPacked();doc.y+=6;
+    drawPacked();closeFrame();doc.y+=24;doc.x=48;
   }
 
   for(const block of blocks) {
